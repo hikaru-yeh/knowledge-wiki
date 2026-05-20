@@ -1,0 +1,263 @@
+{
+  "main": {
+    "id": "2138dc68a0463590",
+    "type": "split",
+    "children": [
+      {
+        "id": "f23ae3331736f311",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d5f7258885d4be7a",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "wiki-pages/index/session-筆記-索引.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "session-筆記-索引"
+            }
+          },
+          {
+            "id": "c0099c596e374c1b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "wiki-pages/index/session-筆記-索引.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "session-筆記-索引"
+            }
+          },
+          {
+            "id": "34df50cfc7cf1e18",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "wiki-pages/專案管理/adr/adr_bridge_creation_via_update.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "adr_bridge_creation_via_update"
+            }
+          }
+        ],
+        "currentTab": 2
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "d24e39ea45b6fe7c",
+    "type": "split",
+    "children": [
+      {
+        "id": "fb185e62eac6473e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7e465c2aacebf762",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "檔案瀏覽器"
+            }
+          },
+          {
+            "id": "af801344612aed31",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": true,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜尋"
+            }
+          },
+          {
+            "id": "d0b2e310b73885dd",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "書籤"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 283.5
+  },
+  "right": {
+    "id": "a27d63b986174301",
+    "type": "split",
+    "children": [
+      {
+        "id": "847f70867b8fca0b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "97f5f2522f0d6bed",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "raw/threads/粉藍狂熱，00k心繫烤乳豬.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "粉藍狂熱，00k心繫烤乳豬 的反向連結"
+            }
+          },
+          {
+            "id": "be7b57a767ab3b2a",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "raw/threads/粉藍狂熱，00k心繫烤乳豬.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "粉藍狂熱，00k心繫烤乳豬 的對外連結"
+            }
+          },
+          {
+            "id": "57c13277ca699e0a",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "標籤"
+            }
+          },
+          {
+            "id": "50ac29d377a755ae",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "所有屬性"
+            }
+          },
+          {
+            "id": "e6d97b2ebcb5f3b5",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "raw/threads/粉藍狂熱，00k心繫烤乳豬.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "粉藍狂熱，00k心繫烤乳豬 的大綱"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:開啟快速切換": false,
+      "graph:查看關聯圖": false,
+      "canvas:建立新畫布": false,
+      "daily-notes:開啟今天的每日筆記": false,
+      "templates:插入模板": false,
+      "command-palette:開啟命令面板": false,
+      "bases:建立新的 base": false
+    }
+  },
+  "active": "34df50cfc7cf1e18",
+  "lastOpenFiles": [
+    "wiki-pages/專案管理/projects/personal_wiki.md",
+    "wiki-pages/專案管理/projects/personal_wiki_v2.md",
+    "wiki-pages/session-筆記/Shane-Wiki-人物消歧-2026-05-20.md",
+    "wiki-pages/專案管理/adr/adr_bridge_page_pattern.md",
+    "wiki-pages/專案管理/adr/adr_rules_extraction.md",
+    "wiki-pages/專案管理/adr/adr_two_layer_architecture.md",
+    "wiki-pages/專案管理/adr/README.md",
+    "wiki-pages/專案管理/adr/adr_bridge_creation_via_update.md",
+    "wiki-pages/專案管理/adr/adr_crossproject_kb_location.md",
+    "wiki-pages/專案管理/errors/README.md",
+    "wiki-pages/session-筆記/AgentMemory-vs-DriftAI-2026-05-15.md",
+    "wiki-pages/專案管理/projects/scribe_treads_saved.md",
+    "wiki-pages/健康生活/健身動作.md",
+    "wiki-pages/健康生活/身心保健.md",
+    "wiki-pages/求職履歷/AI 攻略履歷面試錄取率翻倍.md",
+    "wiki-pages/求職履歷/履歷優化.md",
+    "wiki-pages/求職履歷/面試到最後被問到 WhyShouldWeHireYou.md",
+    "wiki-pages/求職履歷/面試準備.md",
+    "wiki-pages/專案管理/projects/data_pipeline.md",
+    "CLAUDE.md.tmp.6608.6582cf7d3c1b",
+    "CLAUDE.md.tmp.6608.22b31958afa7",
+    "CLAUDE.md.tmp.6608.2cb80092ee7c",
+    "CLAUDE.md.tmp.6608.90933ccac376",
+    "CLAUDE.md.tmp.6608.a6cf1433440d",
+    "wiki-pages/log.md",
+    "wiki-pages/session-筆記/GitHub-Portfolio-Repo-Workflow-2026-05-19.md",
+    "wiki-pages/session-筆記/AgentMemory-Windows-Setup-2026-05-15.md",
+    "wiki-pages/專案管理/projects/career_ops.md",
+    "wiki-pages/index/session-筆記-索引.md",
+    "wiki-pages/專案管理/daily-recap.md",
+    "wiki-pages/專案管理/projects/claude_context_graphify_coexist.md",
+    "wiki-pages/日誌.md.tmp.52776.1778852498258",
+    "未命名.base",
+    "wiki-pages/日誌.md.tmp.4620.1778851841287",
+    "wiki-pages/index/session-筆記-索引.md.tmp.4620.1778851791836",
+    "wiki-pages/session-筆記/AgentMemory-Windows-Setup-2026-05-15.md.tmp.4620.1778851775222",
+    "Pasted image 20260512002944.png",
+    "Pasted image 20260512002933.png",
+    "Pasted image 20260512002922.png",
+    "Pasted image 20260512002908.png",
+    "Pasted image 20260512002841.png",
+    "Pasted image 20260512002827.png",
+    "Pasted image 20260512002812.png",
+    "Pasted image 20260512002759.png",
+    "Pasted image 20260512002750.png"
+  ]
+}

@@ -1,0 +1,1049 @@
+Directory structure:
+└── ralph-loop/
+    ├── README.md
+    ├── LICENSE
+    ├── commands/
+    │   ├── cancel-ralph.md
+    │   ├── help.md
+    │   └── ralph-loop.md
+    ├── hooks/
+    │   ├── hooks.json
+    │   └── stop-hook.sh
+    ├── scripts/
+    │   └── setup-ralph-loop.sh
+    └── .claude-plugin/
+        └── plugin.json
+
+================================================
+FILE: plugins/ralph-loop/README.md
+================================================
+# Ralph Loop Plugin
+
+Implementation of the Ralph Wiggum technique for iterative, self-referential AI development loops in Claude Code.
+
+## What is Ralph Loop?
+
+Ralph Loop is a development methodology based on continuous AI agent loops. As Geoffrey Huntley describes it: **"Ralph is a Bash loop"** - a simple `while true` that repeatedly feeds an AI agent a prompt file, allowing it to iteratively improve its work until completion.
+
+This technique is inspired by the Ralph Wiggum coding technique (named after the character from The Simpsons), embodying the philosophy of persistent iteration despite setbacks.
+
+### Core Concept
+
+This plugin implements Ralph using a **Stop hook** that intercepts Claude's exit attempts:
+
+```bash
+# You run ONCE:
+/ralph-loop "Your task description" --completion-promise "DONE"
+
+# Then Claude Code automatically:
+# 1. Works on the task
+# 2. Tries to exit
+# 3. Stop hook blocks exit
+# 4. Stop hook feeds the SAME prompt back
+# 5. Repeat until completion
+```
+
+The loop happens **inside your current session** - you don't need external bash loops. The Stop hook in `hooks/stop-hook.sh` creates the self-referential feedback loop by blocking normal session exit.
+
+This creates a **self-referential feedback loop** where:
+- The prompt never changes between iterations
+- Claude's previous work persists in files
+- Each iteration sees modified files and git history
+- Claude autonomously improves by reading its own past work in files
+
+## Quick Start
+
+```bash
+/ralph-loop "Build a REST API for todos. Requirements: CRUD operations, input validation, tests. Output <promise>COMPLETE</promise> when done." --completion-promise "COMPLETE" --max-iterations 50
+```
+
+Claude will:
+- Implement the API iteratively
+- Run tests and see failures
+- Fix bugs based on test output
+- Iterate until all requirements met
+- Output the completion promise when done
+
+## Commands
+
+### /ralph-loop
+
+Start a Ralph loop in your current session.
+
+**Usage:**
+```bash
+/ralph-loop "<prompt>" --max-iterations <n> --completion-promise "<text>"
+```
+
+**Options:**
+- `--max-iterations <n>` - Stop after N iterations (default: unlimited)
+- `--completion-promise <text>` - Phrase that signals completion
+
+### /cancel-ralph
+
+Cancel the active Ralph loop.
+
+**Usage:**
+```bash
+/cancel-ralph
+```
+
+## Prompt Writing Best Practices
+
+### 1. Clear Completion Criteria
+
+❌ Bad: "Build a todo API and make it good."
+
+✅ Good:
+```markdown
+Build a REST API for todos.
+
+When complete:
+- All CRUD endpoints working
+- Input validation in place
+- Tests passing (coverage > 80%)
+- README with API docs
+- Output: <promise>COMPLETE</promise>
+```
+
+### 2. Incremental Goals
+
+❌ Bad: "Create a complete e-commerce platform."
+
+✅ Good:
+```markdown
+Phase 1: User authentication (JWT, tests)
+Phase 2: Product catalog (list/search, tests)
+Phase 3: Shopping cart (add/remove, tests)
+
+Output <promise>COMPLETE</promise> when all phases done.
+```
+
+### 3. Self-Correction
+
+❌ Bad: "Write code for feature X."
+
+✅ Good:
+```markdown
+Implement feature X following TDD:
+1. Write failing tests
+2. Implement feature
+3. Run tests
+4. If any fail, debug and fix
+5. Refactor if needed
+6. Repeat until all green
+7. Output: <promise>COMPLETE</promise>
+```
+
+### 4. Escape Hatches
+
+Always use `--max-iterations` as a safety net to prevent infinite loops on impossible tasks:
+
+```bash
+# Recommended: Always set a reasonable iteration limit
+/ralph-loop "Try to implement feature X" --max-iterations 20
+
+# In your prompt, include what to do if stuck:
+# "After 15 iterations, if not complete:
+#  - Document what's blocking progress
+#  - List what was attempted
+#  - Suggest alternative approaches"
+```
+
+**Note**: The `--completion-promise` uses exact string matching, so you cannot use it for multiple completion conditions (like "SUCCESS" vs "BLOCKED"). Always rely on `--max-iterations` as your primary safety mechanism.
+
+## Philosophy
+
+Ralph embodies several key principles:
+
+### 1. Iteration > Perfection
+Don't aim for perfect on first try. Let the loop refine the work.
+
+### 2. Failures Are Data
+"Deterministically bad" means failures are predictable and informative. Use them to tune prompts.
+
+### 3. Operator Skill Matters
+Success depends on writing good prompts, not just having a good model.
+
+### 4. Persistence Wins
+Keep trying until success. The loop handles retry logic automatically.
+
+## When to Use Ralph
+
+**Good for:**
+- Well-defined tasks with clear success criteria
+- Tasks requiring iteration and refinement (e.g., getting tests to pass)
+- Greenfield projects where you can walk away
+- Tasks with automatic verification (tests, linters)
+
+**Not good for:**
+- Tasks requiring human judgment or design decisions
+- One-shot operations
+- Tasks with unclear success criteria
+- Production debugging (use targeted debugging instead)
+
+## Real-World Results
+
+- Successfully generated 6 repositories overnight in Y Combinator hackathon testing
+- One $50k contract completed for $297 in API costs
+- Created entire programming language ("cursed") over 3 months using this approach
+
+## Windows Compatibility
+
+The stop hook uses a bash script that requires Git for Windows to run properly.
+
+**Issue**: On Windows, the `bash` command may resolve to WSL bash (often misconfigured) instead of Git Bash, causing the hook to fail with errors like:
+- `wsl: Unknown key 'automount.crossDistro'`
+- `execvpe(/bin/bash) failed: No such file or directory`
+
+**Workaround**: Edit the cached plugin's `hooks/hooks.json` to use Git Bash explicitly:
+
+```json
+"command": "\"C:/Program Files/Git/bin/bash.exe\" ${CLAUDE_PLUGIN_ROOT}/hooks/stop-hook.sh"
+```
+
+**Location**: `~/.claude/plugins/cache/claude-plugins-official/ralph-wiggum/<hash>/hooks/hooks.json`
+
+**Note**: Use `Git/bin/bash.exe` (the wrapper with proper PATH), not `Git/usr/bin/bash.exe` (raw MinGW bash without utilities in PATH).
+
+## Learn More
+
+- Original technique: https://ghuntley.com/ralph/
+- Ralph Orchestrator: https://github.com/mikeyobrien/ralph-orchestrator
+
+## For Help
+
+Run `/help` in Claude Code for detailed command reference and examples.
+
+
+
+================================================
+FILE: plugins/ralph-loop/LICENSE
+================================================
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+
+
+================================================
+FILE: plugins/ralph-loop/commands/cancel-ralph.md
+================================================
+---
+description: "Cancel active Ralph Loop"
+allowed-tools: ["Bash(test -f .claude/ralph-loop.local.md:*)", "Bash(rm .claude/ralph-loop.local.md)", "Read(.claude/ralph-loop.local.md)"]
+hide-from-slash-command-tool: "true"
+---
+
+# Cancel Ralph
+
+To cancel the Ralph loop:
+
+1. Check if `.claude/ralph-loop.local.md` exists using Bash: `test -f .claude/ralph-loop.local.md && echo "EXISTS" || echo "NOT_FOUND"`
+
+2. **If NOT_FOUND**: Say "No active Ralph loop found."
+
+3. **If EXISTS**:
+   - Read `.claude/ralph-loop.local.md` to get the current iteration number from the `iteration:` field
+   - Remove the file using Bash: `rm .claude/ralph-loop.local.md`
+   - Report: "Cancelled Ralph loop (was at iteration N)" where N is the iteration value
+
+
+
+================================================
+FILE: plugins/ralph-loop/commands/help.md
+================================================
+---
+description: "Explain Ralph Loop plugin and available commands"
+---
+
+# Ralph Loop Plugin Help
+
+Please explain the following to the user:
+
+## What is Ralph Loop?
+
+Ralph Loop implements the Ralph Wiggum technique - an iterative development methodology based on continuous AI loops, pioneered by Geoffrey Huntley.
+
+**Core concept:**
+```bash
+while :; do
+  cat PROMPT.md | claude-code --continue
+done
+```
+
+The same prompt is fed to Claude repeatedly. The "self-referential" aspect comes from Claude seeing its own previous work in the files and git history, not from feeding output back as input.
+
+**Each iteration:**
+1. Claude receives the SAME prompt
+2. Works on the task, modifying files
+3. Tries to exit
+4. Stop hook intercepts and feeds the same prompt again
+5. Claude sees its previous work in the files
+6. Iteratively improves until completion
+
+The technique is described as "deterministically bad in an undeterministic world" - failures are predictable, enabling systematic improvement through prompt tuning.
+
+## Available Commands
+
+### /ralph-loop <PROMPT> [OPTIONS]
+
+Start a Ralph loop in your current session.
+
+**Usage:**
+```
+/ralph-loop "Refactor the cache layer" --max-iterations 20
+/ralph-loop "Add tests" --completion-promise "TESTS COMPLETE"
+```
+
+**Options:**
+- `--max-iterations <n>` - Max iterations before auto-stop
+- `--completion-promise <text>` - Promise phrase to signal completion
+
+**How it works:**
+1. Creates `.claude/.ralph-loop.local.md` state file
+2. You work on the task
+3. When you try to exit, stop hook intercepts
+4. Same prompt fed back
+5. You see your previous work
+6. Continues until promise detected or max iterations
+
+---
+
+### /cancel-ralph
+
+Cancel an active Ralph loop (removes the loop state file).
+
+**Usage:**
+```
+/cancel-ralph
+```
+
+**How it works:**
+- Checks for active loop state file
+- Removes `.claude/.ralph-loop.local.md`
+- Reports cancellation with iteration count
+
+---
+
+## Key Concepts
+
+### Completion Promises
+
+To signal completion, Claude must output a `<promise>` tag:
+
+```
+<promise>TASK COMPLETE</promise>
+```
+
+The stop hook looks for this specific tag. Without it (or `--max-iterations`), Ralph runs infinitely.
+
+### Self-Reference Mechanism
+
+The "loop" doesn't mean Claude talks to itself. It means:
+- Same prompt repeated
+- Claude's work persists in files
+- Each iteration sees previous attempts
+- Builds incrementally toward goal
+
+## Example
+
+### Interactive Bug Fix
+
+```
+/ralph-loop "Fix the token refresh logic in auth.ts. Output <promise>FIXED</promise> when all tests pass." --completion-promise "FIXED" --max-iterations 10
+```
+
+You'll see Ralph:
+- Attempt fixes
+- Run tests
+- See failures
+- Iterate on solution
+- In your current session
+
+## When to Use Ralph
+
+**Good for:**
+- Well-defined tasks with clear success criteria
+- Tasks requiring iteration and refinement
+- Iterative development with self-correction
+- Greenfield projects
+
+**Not good for:**
+- Tasks requiring human judgment or design decisions
+- One-shot operations
+- Tasks with unclear success criteria
+- Debugging production issues (use targeted debugging instead)
+
+## Learn More
+
+- Original technique: https://ghuntley.com/ralph/
+- Ralph Orchestrator: https://github.com/mikeyobrien/ralph-orchestrator
+
+
+
+================================================
+FILE: plugins/ralph-loop/commands/ralph-loop.md
+================================================
+---
+description: "Start Ralph Loop in current session"
+argument-hint: "PROMPT [--max-iterations N] [--completion-promise TEXT]"
+allowed-tools: ["Bash(${CLAUDE_PLUGIN_ROOT}/scripts/setup-ralph-loop.sh:*)"]
+hide-from-slash-command-tool: "true"
+---
+
+# Ralph Loop Command
+
+Execute the setup script to initialize the Ralph loop:
+
+```!
+"${CLAUDE_PLUGIN_ROOT}/scripts/setup-ralph-loop.sh" $ARGUMENTS
+```
+
+Please work on the task. When you try to exit, the Ralph loop will feed the SAME PROMPT back to you for the next iteration. You'll see your previous work in files and git history, allowing you to iterate and improve.
+
+CRITICAL RULE: If a completion promise is set, you may ONLY output it when the statement is completely and unequivocally TRUE. Do not output false promises to escape the loop, even if you think you're stuck or should exit for other reasons. The loop is designed to continue until genuine completion.
+
+
+
+================================================
+FILE: plugins/ralph-loop/hooks/hooks.json
+================================================
+{
+  "description": "Ralph Loop plugin stop hook for self-referential loops",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-hook.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
+
+
+
+================================================
+FILE: plugins/ralph-loop/hooks/stop-hook.sh
+================================================
+#!/bin/bash
+
+# Ralph Loop Stop Hook
+# Prevents session exit when a ralph-loop is active
+# Feeds Claude's output back as input to continue the loop
+
+set -euo pipefail
+
+# Read hook input from stdin (advanced stop hook API)
+HOOK_INPUT=$(cat)
+
+# Check if ralph-loop is active
+RALPH_STATE_FILE=".claude/ralph-loop.local.md"
+
+if [[ ! -f "$RALPH_STATE_FILE" ]]; then
+  # No active loop - allow exit
+  exit 0
+fi
+
+# Parse markdown frontmatter (YAML between ---) and extract values
+FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$RALPH_STATE_FILE")
+ITERATION=$(echo "$FRONTMATTER" | grep '^iteration:' | sed 's/iteration: *//')
+MAX_ITERATIONS=$(echo "$FRONTMATTER" | grep '^max_iterations:' | sed 's/max_iterations: *//')
+# Extract completion_promise and strip surrounding quotes if present
+COMPLETION_PROMISE=$(echo "$FRONTMATTER" | grep '^completion_promise:' | sed 's/completion_promise: *//' | sed 's/^"\(.*\)"$/\1/')
+
+# Session isolation: the state file is project-scoped, but the Stop hook
+# fires in every Claude Code session in that project. If another session
+# started the loop, this session must not block (or touch the state file).
+# Legacy state files without session_id fall through (preserves old behavior).
+STATE_SESSION=$(echo "$FRONTMATTER" | grep '^session_id:' | sed 's/session_id: *//' || true)
+HOOK_SESSION=$(echo "$HOOK_INPUT" | jq -r '.session_id // ""')
+if [[ -n "$STATE_SESSION" ]] && [[ "$STATE_SESSION" != "$HOOK_SESSION" ]]; then
+  exit 0
+fi
+
+# Validate numeric fields before arithmetic operations
+if [[ ! "$ITERATION" =~ ^[0-9]+$ ]]; then
+  echo "⚠️  Ralph loop: State file corrupted" >&2
+  echo "   File: $RALPH_STATE_FILE" >&2
+  echo "   Problem: 'iteration' field is not a valid number (got: '$ITERATION')" >&2
+  echo "" >&2
+  echo "   This usually means the state file was manually edited or corrupted." >&2
+  echo "   Ralph loop is stopping. Run /ralph-loop again to start fresh." >&2
+  rm "$RALPH_STATE_FILE"
+  exit 0
+fi
+
+if [[ ! "$MAX_ITERATIONS" =~ ^[0-9]+$ ]]; then
+  echo "⚠️  Ralph loop: State file corrupted" >&2
+  echo "   File: $RALPH_STATE_FILE" >&2
+  echo "   Problem: 'max_iterations' field is not a valid number (got: '$MAX_ITERATIONS')" >&2
+  echo "" >&2
+  echo "   This usually means the state file was manually edited or corrupted." >&2
+  echo "   Ralph loop is stopping. Run /ralph-loop again to start fresh." >&2
+  rm "$RALPH_STATE_FILE"
+  exit 0
+fi
+
+# Check if max iterations reached
+if [[ $MAX_ITERATIONS -gt 0 ]] && [[ $ITERATION -ge $MAX_ITERATIONS ]]; then
+  echo "🛑 Ralph loop: Max iterations ($MAX_ITERATIONS) reached."
+  rm "$RALPH_STATE_FILE"
+  exit 0
+fi
+
+# Get transcript path from hook input
+TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path')
+
+if [[ ! -f "$TRANSCRIPT_PATH" ]]; then
+  echo "⚠️  Ralph loop: Transcript file not found" >&2
+  echo "   Expected: $TRANSCRIPT_PATH" >&2
+  echo "   This is unusual and may indicate a Claude Code internal issue." >&2
+  echo "   Ralph loop is stopping." >&2
+  rm "$RALPH_STATE_FILE"
+  exit 0
+fi
+
+# Read last assistant message from transcript (JSONL format - one JSON per line)
+# First check if there are any assistant messages
+if ! grep -q '"role":"assistant"' "$TRANSCRIPT_PATH"; then
+  echo "⚠️  Ralph loop: No assistant messages found in transcript" >&2
+  echo "   Transcript: $TRANSCRIPT_PATH" >&2
+  echo "   This is unusual and may indicate a transcript format issue" >&2
+  echo "   Ralph loop is stopping." >&2
+  rm "$RALPH_STATE_FILE"
+  exit 0
+fi
+
+# Extract the most recent assistant text block.
+#
+# Claude Code writes each content block (text/tool_use/thinking) as its own
+# JSONL line, all with role=assistant. So slurp the last N assistant lines,
+# flatten to text blocks only, and take the last one.
+#
+# Capped at the last 100 assistant lines to keep jq's slurp input bounded
+# for long-running sessions.
+LAST_LINES=$(grep '"role":"assistant"' "$TRANSCRIPT_PATH" | tail -n 100)
+if [[ -z "$LAST_LINES" ]]; then
+  echo "⚠️  Ralph loop: Failed to extract assistant messages" >&2
+  echo "   Ralph loop is stopping." >&2
+  rm "$RALPH_STATE_FILE"
+  exit 0
+fi
+
+# Parse the recent lines and pull out the final text block.
+# `last // ""` yields empty string when no text blocks exist (e.g. a turn
+# that is all tool calls). That's fine: empty text means no <promise> tag,
+# so the loop simply continues.
+# (Briefly disable errexit so a jq failure can be caught by the $? check.)
+set +e
+LAST_OUTPUT=$(echo "$LAST_LINES" | jq -rs '
+  map(.message.content[]? | select(.type == "text") | .text) | last // ""
+' 2>&1)
+JQ_EXIT=$?
+set -e
+
+# Check if jq succeeded
+if [[ $JQ_EXIT -ne 0 ]]; then
+  echo "⚠️  Ralph loop: Failed to parse assistant message JSON" >&2
+  echo "   Error: $LAST_OUTPUT" >&2
+  echo "   This may indicate a transcript format issue." >&2
+  echo "   Ralph loop is stopping." >&2
+  rm "$RALPH_STATE_FILE"
+  exit 0
+fi
+
+# Check for completion promise (only if set)
+if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
+  # Extract text from <promise> tags using Perl for multiline support
+  # -0777 slurps entire input, s flag makes . match newlines
+  # .*? is non-greedy (takes FIRST tag), whitespace normalized
+  PROMISE_TEXT=$(echo "$LAST_OUTPUT" | perl -0777 -pe 's/.*?<promise>(.*?)<\/promise>.*/$1/s; s/^\s+|\s+$//g; s/\s+/ /g' 2>/dev/null || echo "")
+
+  # Use = for literal string comparison (not pattern matching)
+  # == in [[ ]] does glob pattern matching which breaks with *, ?, [ characters
+  if [[ -n "$PROMISE_TEXT" ]] && [[ "$PROMISE_TEXT" = "$COMPLETION_PROMISE" ]]; then
+    echo "✅ Ralph loop: Detected <promise>$COMPLETION_PROMISE</promise>"
+    rm "$RALPH_STATE_FILE"
+    exit 0
+  fi
+fi
+
+# Not complete - continue loop with SAME PROMPT
+NEXT_ITERATION=$((ITERATION + 1))
+
+# Extract prompt (everything after the closing ---)
+# Skip first --- line, skip until second --- line, then print everything after
+# Use i>=2 instead of i==2 to handle --- in prompt content
+PROMPT_TEXT=$(awk '/^---$/{i++; next} i>=2' "$RALPH_STATE_FILE")
+
+if [[ -z "$PROMPT_TEXT" ]]; then
+  echo "⚠️  Ralph loop: State file corrupted or incomplete" >&2
+  echo "   File: $RALPH_STATE_FILE" >&2
+  echo "   Problem: No prompt text found" >&2
+  echo "" >&2
+  echo "   This usually means:" >&2
+  echo "     • State file was manually edited" >&2
+  echo "     • File was corrupted during writing" >&2
+  echo "" >&2
+  echo "   Ralph loop is stopping. Run /ralph-loop again to start fresh." >&2
+  rm "$RALPH_STATE_FILE"
+  exit 0
+fi
+
+# Update iteration in frontmatter (portable across macOS and Linux)
+# Create temp file, then atomically replace
+TEMP_FILE="${RALPH_STATE_FILE}.tmp.$$"
+sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$RALPH_STATE_FILE" > "$TEMP_FILE"
+mv "$TEMP_FILE" "$RALPH_STATE_FILE"
+
+# Build system message with iteration count and completion promise info
+if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
+  SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | To stop: output <promise>$COMPLETION_PROMISE</promise> (ONLY when statement is TRUE - do not lie to exit!)"
+else
+  SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | No completion promise set - loop runs infinitely"
+fi
+
+# Output JSON to block the stop and feed prompt back
+# The "reason" field contains the prompt that will be sent back to Claude
+jq -n \
+  --arg prompt "$PROMPT_TEXT" \
+  --arg msg "$SYSTEM_MSG" \
+  '{
+    "decision": "block",
+    "reason": $prompt,
+    "systemMessage": $msg
+  }'
+
+# Exit 0 for successful hook execution
+exit 0
+
+
+
+================================================
+FILE: plugins/ralph-loop/scripts/setup-ralph-loop.sh
+================================================
+#!/bin/bash
+
+# Ralph Loop Setup Script
+# Creates state file for in-session Ralph loop
+
+set -euo pipefail
+
+# Parse arguments
+PROMPT_PARTS=()
+MAX_ITERATIONS=0
+COMPLETION_PROMISE="null"
+
+# Parse options and positional arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -h|--help)
+      cat << 'HELP_EOF'
+Ralph Loop - Interactive self-referential development loop
+
+USAGE:
+  /ralph-loop [PROMPT...] [OPTIONS]
+
+ARGUMENTS:
+  PROMPT...    Initial prompt to start the loop (can be multiple words without quotes)
+
+OPTIONS:
+  --max-iterations <n>           Maximum iterations before auto-stop (default: unlimited)
+  --completion-promise '<text>'  Promise phrase (USE QUOTES for multi-word)
+  -h, --help                     Show this help message
+
+DESCRIPTION:
+  Starts a Ralph Loop in your CURRENT session. The stop hook prevents
+  exit and feeds your output back as input until completion or iteration limit.
+
+  To signal completion, you must output: <promise>YOUR_PHRASE</promise>
+
+  Use this for:
+  - Interactive iteration where you want to see progress
+  - Tasks requiring self-correction and refinement
+  - Learning how Ralph works
+
+EXAMPLES:
+  /ralph-loop Build a todo API --completion-promise 'DONE' --max-iterations 20
+  /ralph-loop --max-iterations 10 Fix the auth bug
+  /ralph-loop Refactor cache layer  (runs forever)
+  /ralph-loop --completion-promise 'TASK COMPLETE' Create a REST API
+
+STOPPING:
+  Only by reaching --max-iterations or detecting --completion-promise
+  No manual stop - Ralph runs infinitely by default!
+
+MONITORING:
+  # View current iteration:
+  grep '^iteration:' .claude/ralph-loop.local.md
+
+  # View full state:
+  head -10 .claude/ralph-loop.local.md
+HELP_EOF
+      exit 0
+      ;;
+    --max-iterations)
+      if [[ -z "${2:-}" ]]; then
+        echo "❌ Error: --max-iterations requires a number argument" >&2
+        echo "" >&2
+        echo "   Valid examples:" >&2
+        echo "     --max-iterations 10" >&2
+        echo "     --max-iterations 50" >&2
+        echo "     --max-iterations 0  (unlimited)" >&2
+        echo "" >&2
+        echo "   You provided: --max-iterations (with no number)" >&2
+        exit 1
+      fi
+      if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+        echo "❌ Error: --max-iterations must be a positive integer or 0, got: $2" >&2
+        echo "" >&2
+        echo "   Valid examples:" >&2
+        echo "     --max-iterations 10" >&2
+        echo "     --max-iterations 50" >&2
+        echo "     --max-iterations 0  (unlimited)" >&2
+        echo "" >&2
+        echo "   Invalid: decimals (10.5), negative numbers (-5), text" >&2
+        exit 1
+      fi
+      MAX_ITERATIONS="$2"
+      shift 2
+      ;;
+    --completion-promise)
+      if [[ -z "${2:-}" ]]; then
+        echo "❌ Error: --completion-promise requires a text argument" >&2
+        echo "" >&2
+        echo "   Valid examples:" >&2
+        echo "     --completion-promise 'DONE'" >&2
+        echo "     --completion-promise 'TASK COMPLETE'" >&2
+        echo "     --completion-promise 'All tests passing'" >&2
+        echo "" >&2
+        echo "   You provided: --completion-promise (with no text)" >&2
+        echo "" >&2
+        echo "   Note: Multi-word promises must be quoted!" >&2
+        exit 1
+      fi
+      COMPLETION_PROMISE="$2"
+      shift 2
+      ;;
+    *)
+      # Non-option argument - collect all as prompt parts
+      PROMPT_PARTS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# Join all prompt parts with spaces
+PROMPT="${PROMPT_PARTS[*]:-}"
+
+# Validate prompt is non-empty
+if [[ -z "$PROMPT" ]]; then
+  echo "❌ Error: No prompt provided" >&2
+  echo "" >&2
+  echo "   Ralph needs a task description to work on." >&2
+  echo "" >&2
+  echo "   Examples:" >&2
+  echo "     /ralph-loop Build a REST API for todos" >&2
+  echo "     /ralph-loop Fix the auth bug --max-iterations 20" >&2
+  echo "     /ralph-loop --completion-promise 'DONE' Refactor code" >&2
+  echo "" >&2
+  echo "   For all options: /ralph-loop --help" >&2
+  exit 1
+fi
+
+# Create state file for stop hook (markdown with YAML frontmatter)
+mkdir -p .claude
+
+# Quote completion promise for YAML if it contains special chars or is not null
+if [[ -n "$COMPLETION_PROMISE" ]] && [[ "$COMPLETION_PROMISE" != "null" ]]; then
+  COMPLETION_PROMISE_YAML="\"$COMPLETION_PROMISE\""
+else
+  COMPLETION_PROMISE_YAML="null"
+fi
+
+cat > .claude/ralph-loop.local.md <<EOF
+---
+active: true
+iteration: 1
+session_id: ${CLAUDE_CODE_SESSION_ID:-}
+max_iterations: $MAX_ITERATIONS
+completion_promise: $COMPLETION_PROMISE_YAML
+started_at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+---
+
+$PROMPT
+EOF
+
+# Output setup message
+cat <<EOF
+🔄 Ralph loop activated in this session!
+
+Iteration: 1
+Max iterations: $(if [[ $MAX_ITERATIONS -gt 0 ]]; then echo $MAX_ITERATIONS; else echo "unlimited"; fi)
+Completion promise: $(if [[ "$COMPLETION_PROMISE" != "null" ]]; then echo "${COMPLETION_PROMISE//\"/} (ONLY output when TRUE - do not lie!)"; else echo "none (runs forever)"; fi)
+
+The stop hook is now active. When you try to exit, the SAME PROMPT will be
+fed back to you. You'll see your previous work in files, creating a
+self-referential loop where you iteratively improve on the same task.
+
+To monitor: head -10 .claude/ralph-loop.local.md
+
+⚠️  WARNING: This loop cannot be stopped manually! It will run infinitely
+    unless you set --max-iterations or --completion-promise.
+
+🔄
+EOF
+
+# Output the initial prompt if provided
+if [[ -n "$PROMPT" ]]; then
+  echo ""
+  echo "$PROMPT"
+fi
+
+# Display completion promise requirements if set
+if [[ "$COMPLETION_PROMISE" != "null" ]]; then
+  echo ""
+  echo "═══════════════════════════════════════════════════════════"
+  echo "CRITICAL - Ralph Loop Completion Promise"
+  echo "═══════════════════════════════════════════════════════════"
+  echo ""
+  echo "To complete this loop, output this EXACT text:"
+  echo "  <promise>$COMPLETION_PROMISE</promise>"
+  echo ""
+  echo "STRICT REQUIREMENTS (DO NOT VIOLATE):"
+  echo "  ✓ Use <promise> XML tags EXACTLY as shown above"
+  echo "  ✓ The statement MUST be completely and unequivocally TRUE"
+  echo "  ✓ Do NOT output false statements to exit the loop"
+  echo "  ✓ Do NOT lie even if you think you should exit"
+  echo ""
+  echo "IMPORTANT - Do not circumvent the loop:"
+  echo "  Even if you believe you're stuck, the task is impossible,"
+  echo "  or you've been running too long - you MUST NOT output a"
+  echo "  false promise statement. The loop is designed to continue"
+  echo "  until the promise is GENUINELY TRUE. Trust the process."
+  echo ""
+  echo "  If the loop should stop, the promise statement will become"
+  echo "  true naturally. Do not force it by lying."
+  echo "═══════════════════════════════════════════════════════════"
+fi
+
+
+
+================================================
+FILE: plugins/ralph-loop/.claude-plugin/plugin.json
+================================================
+{
+  "name": "ralph-loop",
+  "version": "1.0.0",
+  "description": "Continuous self-referential AI loops for interactive iterative development, implementing the Ralph Wiggum technique. Run Claude in a while-true loop with the same prompt until task completion.",
+  "author": {
+    "name": "Anthropic",
+    "email": "support@anthropic.com"
+  }
+}
+
+

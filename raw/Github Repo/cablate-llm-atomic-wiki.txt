@@ -1,0 +1,1899 @@
+Directory structure:
+└── cablate-llm-atomic-wiki/
+    ├── README.md
+    ├── README.zh-TW.md
+    ├── CLAUDE.md
+    ├── METHODOLOGY.md
+    ├── STORY.md
+    ├── atoms/
+    │   ├── README.md
+    │   ├── _template.md
+    │   └── .gitkeep
+    ├── raw/
+    │   ├── README.md
+    │   └── .gitkeep
+    ├── scripts/
+    │   ├── README.md
+    │   ├── gen-index.sh
+    │   ├── lint.sh
+    │   └── log-append.sh
+    └── wiki/
+        ├── _template.md
+        └── .gitkeep
+
+================================================
+FILE: README.md
+================================================
+# llm-atomic-wiki
+
+> Built on top of **Andrej Karpathy's [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)**.
+> All credit to him for the pattern — this repo is what I learned by running it end-to-end, plus four small additions that helped at scale.
+
+**584 posts · 8,668 replies · 630 atoms · 83 wiki pages · 11 branches**
+
+The repo gives you the framework — methodology, schema, scripts, folder structure. Fork it and run it on your own materials. My actual content stays private; the kit is what you get.
+
+🇹🇼 [中文版 README](README.zh-TW.md) · 📖 [the story behind this repo](STORY.md)
+
+---
+
+## What this adds on top of Karpathy's pattern
+
+Karpathy's gist captures the core pattern in beautifully minimal form. The four additions below came from problems I hit while running it at scale — they extend his pattern, they don't replace it.
+
+```
+Karpathy:   raw ─→ wiki
+This repo:  raw ─→ atoms (organized into topic-branches) ─→ wiki
+```
+
+Four additions:
+
+**1. Atom layer.** Karpathy goes raw → wiki in one compile step. I added atoms in between — one atom equals one claim, with frontmatter (source, type, depth, tags, date). Atoms are the source of truth; wiki is a derived cache. When a wiki page gets a fact wrong, you go back to the atom, not the raw source. This solves the "loss of information" and "false sense of source of truth" problems that commenter `frosk1` raised on the original gist.
+
+**2. Topic-branches at the atom layer.** Karpathy's wiki is flat. I organize atoms by topic into branch folders at the repo root (one folder per branch), then compile to flat wiki pages with topic prefixes (`wiki/<branch>-<subtopic>.md`). The atom layer becomes browsable; the wiki layer stays index-friendly.
+
+**3. Two-layer Lint.** Karpathy lumps "find contradictions, ghost links, orphan pages, outdated claims" into a single Lint operation. I split it. A programmatic layer (`scripts/lint.sh`) handles deterministic checks (ghost links, orphan pages, format violations, outdated markers) in seconds. An LLM layer handles semantic checks (contradictions, expired claims). The programmatic layer runs first so the LLM doesn't waste attention on format issues.
+
+**4. Parallel-compile naming lock.** Karpathy compiles one page at a time. When N agents compile in parallel, they invent different filenames for the same content (`mcp-plus-skills.md` vs `mcp-plus-skills-architecture.md`). The fix is to pre-lock the slug namespace before fanning out. Agents fill content into pre-named slots; they do not name files.
+
+---
+
+## Proof
+
+| Stage | Numbers |
+|-------|---------|
+| Raw input | 584 posts + 8,668 replies + lecture/course materials |
+| Filter pass-through | Posts 70–90% kept, replies ~13% kept (87% noise) |
+| Atoms extracted | 630 (immutable, source of truth) |
+| Branches | 11 (one folder at repo root per topic) |
+| Wiki pages compiled | 83 (3–8 atoms per page) |
+| Lint warnings (tightened) | 16 (down from 47 before regex was tightened) |
+| Largest branch | 101 atoms |
+| Smallest branch | 23 atoms |
+
+---
+
+## How it works
+
+```
+┌─────────┐  Ingest    ┌────────────┐  Compile   ┌─────────┐
+│  raw/   │ ─────────▶ │ <branch>/  │ ─────────▶ │  wiki/  │
+│         │  (LLM      │ atom.md    │  (LLM      │ flat    │
+│ sources │  extract)  │ atom.md    │  group)    │ pages   │
+└─────────┘            │ ...        │            └────┬────┘
+                       └────────────┘                 │
+                                                      │
+                                ┌─────────────────────┼─────────────────────┐
+                                ▼                     ▼                     ▼
+                          gen-index.sh           lint.sh              log-append.sh
+                              │                     │                     │
+                              ▼                     ▼                     ▼
+                          index.md           lint-report.md            log.md
+```
+
+Compare to Karpathy's loop:
+
+```
+Karpathy:   raw → wiki → {Ingest, Query, Lint}
+This repo:  raw → atoms → wiki → {Ingest, Query, programmatic Lint, LLM Lint}
+```
+
+Atoms are where the real work happens. Wiki is rebuildable from atoms; atoms are not rebuildable from wiki.
+
+---
+
+## What's in this repo
+
+```
+llm-atomic-wiki/
+├── README.md              ← you are here
+├── README.zh-TW.md        ← Chinese version
+├── STORY.md               ← the personal story of running it end-to-end
+├── METHODOLOGY.md         ← 6-phase pipeline
+├── CLAUDE.md              ← schema for the LLM operating this repo
+│
+├── raw/                   ← drop your source materials here (gitignored)
+│
+├── atoms/                 ← knowledge atoms, organized by topic-branch (gitignored)
+│   ├── README.md
+│   ├── _template.md       ← copy when creating a new atom
+│   ├── <branch-1>/        ← one folder per topic-branch
+│   ├── <branch-2>/        ← e.g. ai-agent/, ai-skills/, mcp/, ...
+│   └── ...
+│
+├── wiki/                  ← compiled pages, flat (gitignored)
+│   └── _template.md       ← copy when creating a new wiki page
+│
+├── index.md               ← auto-generated navigation (gitignored)
+├── log.md                 ← change log, append-only (gitignored)
+│
+└── scripts/
+    ├── lint.sh            ← programmatic Lint
+    ├── gen-index.sh       ← rebuild index.md from wiki/
+    ├── log-append.sh      ← append a change entry to log.md
+    └── README.md
+```
+
+The framework files (READMEs, METHODOLOGY, CLAUDE, scripts, templates) are versioned. Your actual content (raw, branch folders, wiki, generated index/log) is gitignored — this is intentional and load-bearing. The repo is the kit, not the data.
+
+---
+
+## Quickstart
+
+1. **Fork this repo.**
+2. **Read `METHODOLOGY.md`** — six phases from raw to wiki, plus the maintenance loop.
+3. **Read `CLAUDE.md`** — the formal spec (atom format, wiki format, branch rules, operations, what not to do).
+4. **Edit `.gitignore`** — replace the listed branch names with your own.
+5. **Drop materials into `raw/`** — any text format. PDFs, transcripts, post dumps, articles.
+6. **Drive the pipeline with an LLM** — point Claude Code (or your agent) at `CLAUDE.md` and ask it to ingest a batch.
+7. **Run the scripts** after each compile:
+   ```bash
+   ./scripts/gen-index.sh        # rebuild wiki index
+   ./scripts/lint.sh             # programmatic health check
+   ./scripts/log-append.sh "..." # record what changed
+   ```
+8. **Run an LLM Lint pass** weekly or after major ingests — see `METHODOLOGY.md`.
+
+The whole loop is `Ingest → Compile → Index/Log → Lint → Query`. Re-run as you accumulate materials.
+
+---
+
+## Deep dives
+
+- **[STORY.md](STORY.md)** — the personal story: why I ran it, what worked, what surprised me.
+- **[METHODOLOGY.md](METHODOLOGY.md)** — the six-phase pipeline (skeleton → segment-classify → extract → quality pass → external check → wiki compile) and the three maintenance operations.
+- **[CLAUDE.md](CLAUDE.md)** — the formal spec for any LLM operating this repo.
+
+---
+
+## Why this matters (and when it doesn't)
+
+Karpathy's thesis is that knowledge should be a persistent, compounded artifact — not regenerated from raw sources on every query. Compile beats RAG, in his framing. I agree, but with conditions:
+
+- **Knowledge volume under ~200 wiki pages.** Past that, index.md scans degrade and you need vector search alongside.
+- **Knowledge is relatively stable.** This is a cognitive map, not breaking news. Update cadence in days/weeks, not minutes.
+- **There's a single owner with a point of view.** Personal knowledge, not a hundred-author aggregation.
+- **Quality matters more than coverage.** 50 pages written tight beat 500 pages written shallow.
+
+Outside these conditions, RAG is often the better fit. The two are not exclusive — compile your stable core, RAG your long tail.
+
+A frame that I think gets undersold: Karpathy's real contribution isn't wiki quality. It's that **LLMs don't get bored maintaining the wiki**. The bookkeeping tax that kills most personal knowledge systems is the maintenance, not the structure. LLMs change the cost structure of maintenance — and that's the unlock the gist points at, more than any specific format choice.
+
+---
+
+## Credit
+
+The pattern, the schema, the operations (Ingest / Query / Lint), the philosophy of compile-over-retrieve — all that is **[Andrej Karpathy's](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)**. If you find this repo useful, his gist is the thing to read first.
+
+What this repo adds on top:
+- Four small additions to Karpathy's pattern (atom layer, topic-branches, two-layer Lint, parallel-compile lock)
+- A reference implementation methodology
+- A bilingual README and a story doc
+
+If you fork it and find it useful, a star on Karpathy's original gist is more deserved than one on this repo.
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=cablate/llm-atomic-wiki&type=Date)](https://star-history.com/#cablate/llm-atomic-wiki&Date)
+
+
+
+================================================
+FILE: README.zh-TW.md
+================================================
+# llm-atomic-wiki
+
+> **Andrej Karpathy 的 [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** 是這整套東西的源頭。
+> 我把他的 pattern 從零跑完一輪、踩完該踩的坑，然後加了四個規模大起來後會撐不住的地方。
+
+**584 篇貼文 · 8,668 則回覆 · 630 個原子 · 83 頁 wiki · 11 個分支**
+
+這個 repo 只給你框架——方法論、schema、腳本、資料夾結構。fork 下去跑你自己的素材，我實際的原子跟 wiki 都不在這包裡。
+
+🇺🇸 [English README](README.md) · 📖 [the story behind this repo (English)](STORY.md)
+
+---
+
+## 在 Karpathy 的 pattern 上加了什麼
+
+Karpathy 的 gist 用最少的零件把整個 pattern 講完。下面四件事是我跑到一定規模後撞上的問題——是延伸他的做法，不是取代。
+
+```
+Karpathy:   raw ─→ wiki
+本 repo:    raw ─→ atoms（按主題分支組織）─→ wiki
+```
+
+四件事：
+
+**1. 原子層。** Karpathy 從 raw 一步編譯到 wiki。我在中間加了 atoms——一個原子等於一個論點，附 frontmatter（來源、類型、深度、標籤、日期）。原子是 source of truth，wiki 是 derived cache。當 wiki 頁面寫錯事實時，你回到原子查證，不是回到原始素材。這解決了原 gist 留言區 `frosk1` 提的「資訊損失」與「false sense of source of truth」問題。
+
+**2. 主題分支落在原子層。** Karpathy 的 wiki 是扁平的。我把原子按主題分到 repo root 的分支資料夾（一個分支一個資料夾），編譯成扁平的 wiki 頁面、檔名帶主題前綴（`wiki/<branch>-<subtopic>.md`）。原子層好瀏覽、wiki 層好用 index 定位。
+
+**3. 兩層 Lint。** Karpathy 把「找矛盾、幽靈連結、孤立頁面、過時聲明」混成一個 Lint 操作。我拆開：程式層（`scripts/lint.sh`）處理確定性檢查（幽靈連結、孤立頁面、格式違規、時效標記），秒級完成；LLM 層處理語意檢查（矛盾、過期判斷）。程式層先跑，避免 LLM 注意力被格式問題吃掉。
+
+**4. 平行編譯的命名鎖。** Karpathy 一次寫一頁。當 N 個 agent 平行編譯時，會給同一批內容生出不同檔名（`mcp-plus-skills.md` vs `mcp-plus-skills-architecture.md`）。解法是 fan out 之前先鎖定 slug 命名空間。Agent 把內容填進預定義好的槽位，不負責取名字。
+
+---
+
+## 證據
+
+| 階段 | 數值 |
+|------|------|
+| 原始素材 | 584 篇貼文 + 8,668 則回覆 + 講座/課程素材 |
+| 過濾通過率 | 貼文留 70–90%，回覆留約 13%（87% 是噪音） |
+| 萃取原子 | 630（immutable，source of truth） |
+| 分支數 | 11（一個資料夾一個主題，放在 root） |
+| 編譯 wiki 頁 | 83（每頁 3–8 個原子） |
+| Lint warnings（收緊後）| 16（從 47 降下來，靠收緊 regex） |
+| 最大分支 | 101 個原子 |
+| 最小分支 | 23 個原子 |
+
+---
+
+## 流程怎麼跑
+
+```
+┌─────────┐  Ingest    ┌────────────┐  Compile   ┌─────────┐
+│  raw/   │ ─────────▶ │ <branch>/  │ ─────────▶ │  wiki/  │
+│         │  (LLM      │ atom.md    │  (LLM      │ flat    │
+│ 素材    │  萃取)     │ atom.md    │  群組)     │ 頁面    │
+└─────────┘            │ ...        │            └────┬────┘
+                       └────────────┘                 │
+                                                      │
+                                ┌─────────────────────┼─────────────────────┐
+                                ▼                     ▼                     ▼
+                          gen-index.sh           lint.sh              log-append.sh
+                              │                     │                     │
+                              ▼                     ▼                     ▼
+                          index.md           lint-report.md            log.md
+```
+
+對照 Karpathy 的迴圈：
+
+```
+Karpathy:   raw → wiki → {Ingest, Query, Lint}
+本 repo:    raw → atoms → wiki → {Ingest, Query, 程式 Lint, LLM Lint}
+```
+
+真正的活幹在 atoms 層。Wiki 可以從 atoms 重建，atoms 不能從 wiki 重建。
+
+---
+
+## 這 repo 裡有什麼
+
+```
+llm-atomic-wiki/
+├── README.md              ← 英文版
+├── README.zh-TW.md        ← 你在這
+├── STORY.md               ← 跑完一輪的個人故事（英文）
+├── METHODOLOGY.md         ← 6 階段流水線
+├── CLAUDE.md              ← 給 LLM 的 schema
+│
+├── raw/                   ← 你的原始素材丟這（gitignore）
+│
+├── atoms/                 ← 知識原子，按主題分支組織（gitignore）
+│   ├── README.md
+│   ├── _template.md       ← 建新原子時複製
+│   ├── <branch-1>/        ← 一個分支一個資料夾
+│   ├── <branch-2>/        ← 例：ai-agent/、ai-skills/、mcp/...
+│   └── ...
+│
+├── wiki/                  ← 編譯產物，扁平（gitignore）
+│   └── _template.md       ← 建新 wiki 頁時複製
+│
+├── index.md               ← 自動產生的導航（gitignore）
+├── log.md                 ← 變更紀錄，append-only（gitignore）
+│
+└── scripts/
+    ├── lint.sh            ← 程式層 Lint
+    ├── gen-index.sh       ← 從 wiki/ 重建 index.md
+    ├── log-append.sh      ← 追加一筆變更到 log.md
+    └── README.md
+```
+
+框架檔（README、METHODOLOGY、CLAUDE、scripts、各層 _template）進版控。實際內容（raw、atoms 內的分支與原子、wiki、產出的 index/log）gitignore——這是刻意的也是核心設計。這個 repo 是 kit，不是資料。
+
+---
+
+## 快速上手
+
+1. **Fork 這個 repo。**
+2. **讀 `METHODOLOGY.md`** ——從 raw 到 wiki 的六階段，加上維護迴圈。
+3. **讀 `CLAUDE.md`** ——正式 spec（原子格式、wiki 格式、分支規則、操作、禁忌）。
+4. **編輯 `.gitignore`** ——把列出的分支名換成你自己的。
+5. **把素材丟進 `raw/`** ——任何文字格式都行。PDF、逐字稿、貼文匯出、文章。
+6. **用 LLM 驅動流水線** ——把 Claude Code（或你的 agent）指向 `CLAUDE.md`，叫它 ingest 一批。
+7. **每次編譯後跑腳本：**
+   ```bash
+   ./scripts/gen-index.sh        # 重建 wiki 索引
+   ./scripts/lint.sh             # 程式層健康檢查
+   ./scripts/log-append.sh "..." # 記錄變更
+   ```
+8. **每週或大量 ingest 後跑一輪 LLM Lint** ——詳見 `METHODOLOGY.md`。
+
+整個迴圈：`Ingest → Compile → Index/Log → Lint → Query`。隨素材累積反覆跑。
+
+---
+
+## 深入閱讀
+
+- **[STORY.md](STORY.md)** ——個人故事：為什麼跑、什麼有用、什麼出乎意料（英文）。
+- **[METHODOLOGY.md](METHODOLOGY.md)** ——六階段流水線（骨架 → 段落分類 → 萃取 → 品質整理 → 外部校驗 → wiki 編譯）和三個維護操作。
+- **[CLAUDE.md](CLAUDE.md)** ——告訴 LLM 怎麼操作這個 repo 的正式 spec。
+
+---
+
+## 為什麼這值得（以及什麼時候不值得）
+
+Karpathy 的論點是知識應該是持久的複利產物，不該每次查詢都從原始素材重新生成——Compile 勝過 RAG。我同意，但有條件：
+
+- **知識量在 ~200 頁 wiki 以內。** 超過後 index.md 掃描效能掉，需要搭配向量搜尋。
+- **知識相對穩定。** 你整理的是認知地圖、不是即時新聞。更新頻率以天/週計，不是分鐘。
+- **有單一觀點主人。** 個人知識整理，不是聚合一百個作者的意見。
+- **品質比覆蓋率重要。** 50 頁寫透勝過 500 頁淺淺帶過。
+
+不符合這些條件時，RAG 通常更合適。兩者不互斥——核心知識用 compile、長尾用 RAG。
+
+這 gist 真正的洞察常被低估：Karpathy 的核心貢獻不在 wiki 品質好不好，在**LLM 不會厭倦維護 wiki 這件事**。大多數個人知識系統死掉不是結構爛，是維護成本太高、人撐不住。LLM 把維護成本的性質整個換掉——這才是 gist 指向的真正解鎖點，比任何格式細節都關鍵。
+
+---
+
+## Credit
+
+Pattern、schema、操作（Ingest / Query / Lint）、compile > retrieve 的核心論點——全部是 **[Andrej Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** 的。這個 repo 有用的話，先去讀他的 gist 比先讀我這包更值得。
+
+這包裡的東西：
+- 四個加在 Karpathy pattern 上的小擴充（原子層、主題分支、兩層 Lint、平行編譯命名鎖）
+- 一份參考實作方法論
+- 雙語 README 跟故事文件
+
+fork 後覺得有用的話，去他的 gist 點星比點我的 repo 更該。
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=cablate/llm-atomic-wiki&type=Date)](https://star-history.com/#cablate/llm-atomic-wiki&Date)
+
+
+
+================================================
+FILE: CLAUDE.md
+================================================
+# CLAUDE.md — Schema for LLMs operating this repo
+
+You are operating on a knowledge base built on the LLM Wiki pattern (Karpathy 2026), with four optimizations: an atom layer, topic-branch organization, two-layer Lint, and parallel-compile naming locks.
+
+This file is the formal spec — read it before touching anything. Mental model, operations, file formats, lifecycle rules, and what you must never do.
+
+---
+
+## Mental model
+
+Three storage layers, one navigation layer, one log layer:
+
+```
+raw/                  sources you may read but never write
+atoms/                knowledge atoms, organized by topic-branch
+  <branch-1>/         one folder per topic
+  <branch-2>/         each contains atoms (source of truth)
+  ...
+wiki/                 compiled pages from atoms, derived cache
+index.md              auto-generated wiki navigation
+log.md                append-only change history
+```
+
+Atoms are immutable. Wiki is rebuildable from atoms. If a wiki page is wrong, fix the underlying atom and recompile, never patch the wiki.
+
+Each branch folder under `atoms/` holds the atoms for that topic, plus an optional `_archive/` for superseded atoms.
+
+---
+
+## Atom format (spec)
+
+### Frontmatter (YAML, required)
+
+```yaml
+---
+id: <branch>/<descriptive-slug>
+type: explanation | opinion | tutorial | myth-busting | case-study | comparison
+depth: beginner | intermediate | advanced
+source_type: post | reply | thread | transcript | article | note | screenshot | audio
+source_ids: []
+reuse_score: high | medium | low
+tags: []
+created: YYYY-MM-DD
+---
+```
+
+| Field | Notes |
+|-------|-------|
+| `id` | Format `<branch>/<slug>`. Slug all lowercase, hyphens only. Must be unique within branch. |
+| `type` | What kind of knowledge this atom carries. Pick one. |
+| `depth` | Audience level. Used in gap analysis. |
+| `source_type` | Where the raw came from. Extend the enum if your sources differ. |
+| `source_ids` | Stable identifiers (URLs, paths, post IDs). Atoms without source attribution are not auditable. |
+| `reuse_score` | `high` = standalone-publishable, `medium` = needs companions, `low` = niche. |
+| `tags` | Cross-cutting concerns. Used to surface related atoms across branches. |
+| `created` | ISO date. Used for chronological ordering and stale-detection. |
+
+Optional fields you may add: `confidence` (high/medium/low), `superseded_by` (id of replacement atom), `archived` (boolean).
+
+### Filename
+
+Pattern: `YYYY-MM-DD-<descriptive-slug>.md`
+
+- Date prefix gives natural chronological order in `ls`.
+- Slug all lowercase, hyphens only — no underscores, no spaces, no uppercase.
+- Slug should be 3–6 words describing the core claim.
+
+### Body
+
+- One core claim per atom. If two independent claims share a paragraph, split into two atoms.
+- Refine, don't copy. Strip filler from the source; preserve the author's voice and stance.
+- Cite source at the end if you want traceability beyond `source_ids`.
+
+### Lifecycle (immutable)
+
+Atoms are immutable. Do not edit after creation.
+
+When knowledge evolves:
+1. Create a new atom with the updated claim.
+2. Add `superseded_by: <new-atom-id>` to the old atom's frontmatter.
+3. Move the old atom to `atoms/<branch>/_archive/`.
+4. Recompile any wiki page that referenced the old atom.
+
+Never delete an atom outright. Use `_archive/`. Final deletion is a separate, conscious decision.
+
+See `atoms/_template.md` for a copyable starter.
+
+---
+
+## Wiki page format (spec)
+
+### Filename
+
+Pattern: `<branch>-<topic-slug>.md`
+
+- Branch prefix lets `gen-index.sh` group pages.
+- All lowercase, hyphens only.
+- Lives flat in `wiki/`, not in subfolders.
+
+### First line
+
+Must be `# Title`. `gen-index.sh` reads this for the index entry. Lint flags violations.
+
+### Wiki links
+
+Pattern: `[[slug]]` or `[[slug|display text]]`
+
+- The slug must equal an existing wiki filename without `.md`.
+- Lint flags ghost links and orphan pages.
+
+### Body structure
+
+```markdown
+# Page Title
+
+Opening paragraph: why this matters, common misconception, what you'll get.
+
+## Section
+Integrated content from multiple atoms, written as coherent prose.
+First mention of a related concept gets a [[wiki-link]]; subsequent
+mentions in the same page don't repeat it.
+
+## Section
+Continue.
+
+---
+
+**See also**
+- [[related-page]] — one-line description
+
+---
+*Compiled from atoms: branch/atom-slug-1, branch/atom-slug-2, ...*
+```
+
+### Length
+
+- Target 1500–2500 words per page.
+- Past 2500 words: consider splitting.
+- Below 800 words: consider merging or staying at atom level.
+
+### Temporal markers
+
+In time-sensitive claims, use one of:
+- Specific date: `as of 2026-04`, `截至 2026-04`
+- Version number: `v3.5`, `Claude 3.5 Sonnet`
+
+Avoid bare `currently` / `latest` / `now` / `目前` / `現在` in time-sensitive contexts. Lint regex flags only `<temporal word> <version/date>` combinations to avoid false-positive flooding from rhetorical use.
+
+See `wiki/_template.md` for a copyable starter.
+
+---
+
+## Branch design (spec)
+
+### When to add a branch (all four required)
+
+1. **Independence** — the topic doesn't fit cleanly under any existing branch.
+2. **Scale** — you expect 5+ atoms in this branch.
+3. **Clear boundary** — you can write a one-paragraph rule for "what belongs, what doesn't".
+4. **Teaching independence** — the branch could anchor a 30-minute talk on its own.
+
+If only 1–2 atoms fit a candidate topic, use tags instead.
+
+### When to merge or remove
+
+- **Hollow** — branch holds <3 atoms with no growth trajectory.
+- **Overlap** — >50% of atoms also tagged with another branch → merge or redefine.
+- **Subset** — branch A's content is essentially a subset of branch B → merge.
+
+### When to split
+
+- **Bloat** — single branch exceeds 30 atoms and content naturally clusters.
+- **Teaching need** — preparing a course reveals the branch needs to split.
+
+### One atom, one branch
+
+If an atom spans two branches, pick the one matching the core claim. Use `tags` for the secondary topic.
+
+### Operations checklist
+
+When adding/merging/splitting:
+1. Document the rationale (one-paragraph note in `log.md`).
+2. Update branch lists in any docs that enumerate them.
+3. Move affected atoms (update their frontmatter `id`).
+4. Confirm no orphan tags or broken `[[ ]]` references remain.
+
+---
+
+## Operations
+
+You execute four operations on demand:
+
+### Ingest
+
+User adds new material to `raw/` (or any source location). You read it, classify each segment ("extract" / "skip" / "deferred"), then extract the "extract" segments into atoms under the matching `atoms/<branch>/` folder.
+
+Constraints:
+- One atom equals one claim.
+- Use the frontmatter format above. Do not invent fields.
+- Place atoms in the matching topic-branch. If no branch fits, list as deferred candidate; do not invent branches without user approval.
+- Preserve the author's voice. Personal knowledge base, not neutral encyclopedia.
+- Atoms are immutable once created.
+
+### Compile
+
+Take a set of related atoms and produce a wiki page synthesizing them.
+
+Constraints:
+- Group by topic, not one atom per page. Typical wiki page = 3–8 atoms.
+- Filename `<branch>-<topic-slug>.md`, all lowercase, hyphens only.
+- First line must be `# title`.
+- Use `[[wiki-link]]` for cross-references. Slug inside `[[ ]]` must equal an existing wiki filename without `.md`.
+- For temporal claims, use specific dates or version numbers.
+- Footer lists source atoms by id.
+
+If multiple agents compile in parallel: a coordinator pre-locks the slug list. Each agent fills assigned slugs, never names files.
+
+### Query
+
+User asks a question. You read `index.md` to locate relevant wiki pages, load only those (not the whole wiki), and answer based on them. If the answer requires synthesis worth retaining, propose writing it back as a new atom.
+
+Constraints:
+- Do not load the entire wiki by default. Use `index.md` to scope.
+- Cite which pages you drew from.
+- Distinguish "this is in the wiki" from "this is my synthesis on top of the wiki".
+
+### Lint
+
+Two layers, run in order:
+
+**Programmatic Lint** (`scripts/lint.sh`) — runs first, no LLM needed. Checks ghost links, orphan pages, format violations, outdated markers. Output: `lint-report.md`.
+
+**LLM Lint** — runs after programmatic Lint passes. Read `index.md` plus all wiki pages and check:
+- **Contradictions** — page A says "X is best practice", page B says "X is deprecated". Flag both with paths and quoted segments.
+- **Concept gaps** — multiple pages reference a concept that has no dedicated page. Propose as candidate.
+- **Expired claims** — version numbers, dates, temporal markers in time-sensitive contexts. Verify or flag.
+- **Weak orphans** — pages with weak conceptual link to the rest, even if technically linked.
+
+Append findings to `lint-report.md` under an `## LLM Lint` section, sorted by severity (contradictions > concept gaps > expired claims > weak orphans).
+
+---
+
+## After every change
+
+Run these in order:
+
+```bash
+./scripts/gen-index.sh                    # rebuild index
+./scripts/log-append.sh "what you did"    # record change
+```
+
+Then if you compiled or modified wiki pages:
+
+```bash
+./scripts/lint.sh                         # programmatic Lint
+```
+
+If `lint.sh` reports errors (not just warnings), fix them before declaring done.
+
+---
+
+## Source attribution patterns
+
+Three options for `source_ids`:
+
+```yaml
+# URL-based (public content)
+source_ids: ["https://example.com/post/12345"]
+
+# File-based (private materials)
+source_ids: ["lectures/2026-04-12-skill-design.md"]
+
+# Hash-based (when source stability matters)
+source_ids: ["sha256:abc123..."]
+```
+
+Use hash IDs when you need to detect that a source was modified after extraction.
+
+---
+
+## What you must not do
+
+- **Edit atoms after creation.** They are immutable. Create a new atom, archive the old one.
+- **Write to `raw/`.** It is read-only from your perspective.
+- **Invent branches without user approval.** Branch design has independence/scale/boundary criteria.
+- **Use bold/italic to compensate for unclear writing.** If a sentence needs emphasis to be understood, rewrite the sentence.
+- **Patch wiki pages to hide atom-layer problems.** If the wiki is wrong because an atom is wrong, fix the atom.
+- **Compile in parallel without a slug lock.** You will produce naming collisions.
+- **Treat the wiki as source of truth.** It is a derived cache. The atoms are truth.
+- **Silently delete atoms or wiki pages.** Move to `_archive/`, never `rm`.
+
+---
+
+## Customizing for your domain
+
+The defaults ship with reasonable opinionated choices. To adapt:
+
+- **Add `source_type` values** for your sources (e.g. `email`, `slack`, `obsidian`).
+- **Add `type` values** if your knowledge has categories beyond the seven defaults.
+- **Adjust temporal regex** in `scripts/lint.sh` to match your conventions.
+- **Define your own branch boundary table** in your fork's `STORY.md` or methodology notes.
+- **Tune length thresholds** if your wiki style is denser or looser than 1500–2500 words.
+
+Document any deviation — rules and scripts are coupled, divergence without documentation will confuse future contributors (including future-you).
+
+---
+
+## When in doubt
+
+Defer to the user. This repo represents their knowledge, organized to their standards. Your job is to operate the pipeline reliably, not to make judgment calls about what their knowledge should look like. If something feels ambiguous, surface it instead of guessing.
+
+---
+
+*This schema corresponds to Karpathy's CLAUDE.md role in the original LLM Wiki gist, extended with the four optimizations this repo adds (atom layer, topic-branches, two-layer Lint, parallel-compile naming locks).*
+
+
+
+================================================
+FILE: METHODOLOGY.md
+================================================
+# From Scattered Materials to Usable Knowledge: An AI-Assisted Knowledge Compilation Methodology
+
+You have a pile of scattered content — posts, replies, lecture transcripts, notes, screenshots, audio — and you know there's value in it, but every time you need something you can't find it, and when you do find it you have to re-read to remember what it said.
+
+This document records a battle-tested pipeline: **use AI to refine raw material of any format into structured knowledge atoms, then compile those atoms into readable, cross-referenced wiki pages.**
+
+Not RAG. Not re-searching raw sources on every query. A one-time token investment to organize knowledge so that future queries just read the wiki.
+
+---
+
+## The core claim: Compile > RAG (at the personal knowledge base scale)
+
+Andrej Karpathy's LLM Wiki pattern (2026) argues that "compile" beats "retrieval-augmented generation":
+
+**The RAG problem**: every query has to re-search the raw material, re-understand it, re-assemble it. Tokens spent on repeated understanding, and results can vary run to run.
+
+**The compile approach**: spend tokens once to understand the raw material thoroughly, producing structured wiki pages. Subsequent queries just read the wiki, never touching the raw source. Knowledge becomes a "persistent, compounded artifact" rather than something regenerated each time.
+
+### Conditions for this claim to hold
+
+1. **Manageable knowledge volume** — around 100–200 wiki pages. Beyond that, LLMs struggle to use `index.md` effectively and you'll want a hybrid (wiki as primary structure + vector search for locating).
+2. **Relatively stable knowledge** — you're building a cognitive map, not a newsfeed. Updates in days or weeks, not minutes.
+3. **Single owner with a point of view** — personal knowledge with a consistent stance, not an aggregation of many voices.
+4. **Quality over coverage** — 50 pages written tight beat 500 pages written shallow.
+
+### Honest limitations
+
+- No peer-reviewed benchmark comparing Compile vs RAG. Karpathy's evidence is "it feels good to use."
+- Past a few hundred pages, pure wiki structure hits navigation bottlenecks. Pair with vector search for locating.
+- Compile cost is non-trivial — first Ingest of a large corpus burns significant tokens. But marginal cost decreases after that.
+- Knowledge goes stale. Lint is periodic, not one-shot.
+
+---
+
+## Pipeline overview
+
+```
+Raw material (text in any format)
+    ↓ Phase 1: design the classification structure
+    ↓ Phase 2: segment classification (extract / skip)
+    ↓ Phase 3: extract into knowledge atoms (one claim per atom)
+Structured knowledge atoms
+    ↓ Phase 4: quality pass (dedupe, reclassify, gap analysis)
+    ↓ Phase 5: external verification + branch summaries
+Verified atoms + branch summaries
+    ↓ Phase 6: compile into wiki pages
+Wiki pages (readable, cross-referenced)
+    ↓ Continuous maintenance
+Ingest new material / Query back-writes / Lint checks
+```
+
+Each phase can run independently. You can stop at atoms, or skip atoms and go straight to wiki. But going through the full pipeline produces the best result.
+
+---
+
+## Phase 1: Skeleton design
+
+**Goal**: decide the topic tree — how your knowledge should be classified.
+
+### Input
+- Your intuitive sense of your own knowledge landscape
+- (Optional) your teaching products, content roadmap, or professional domain
+
+### Operation
+1. List the topics your knowledge covers (doesn't need to be perfect — iterate)
+2. Create one folder per topic ("branch") under `atoms/` (e.g. `atoms/ai-agent/`, `atoms/mcp/`)
+3. Write a short note describing each branch's definition and boundary (in `STORY.md` or your own notes)
+
+### Branch design principles
+
+A good branch satisfies:
+- **Independence** — can't fit cleanly into any existing branch
+- **Scale** — expected to hold 5+ knowledge points
+- **Clear boundaries** — you can articulate "what belongs, what doesn't"
+- **Teaching independence** — can anchor at least 30 minutes of instruction on its own
+
+Common mistakes:
+- Branches too fine (each holds only 2–3 atoms) → use tags instead
+- Branches too coarse (50+ atoms spanning three unrelated topics) → split
+- Boundaries blurry (>50% of atoms also tagged with another branch) → merge or redefine
+
+### AI's role
+
+Let AI review your material list and propose a branch structure. But the final call is yours — AI doesn't know your teaching positioning or differentiation.
+
+---
+
+## Phase 2: Segment classification
+
+**Goal**: scan raw material and mark each segment "extract" / "skip" / "deferred".
+
+This is the quality gatekeeper. Skipping classification and extracting everything produces a flood of low-quality atoms, and cleanup costs more than prevention. Real data: social media replies filter at ~87% — most replies are noise (emojis, greetings, "+1"). Classify first, only extract the segments worth extracting.
+
+### Classification criteria
+
+Per segment, mark:
+
+- **Extract** — contains a knowledge point, view, experience, or method that stands alone. Even out of original context, this segment has teaching or reference value.
+- **Skip** — pure social interaction, restating others' views, filler agreement, action items ("tomorrow do X"), pure emotion.
+- **Deferred** — potentially valuable but uncertain, or requires surrounding context to understand. Skip in the first pass; revisit after the full batch is classified.
+
+### Extraction rate expectations by source type
+
+| Source | Expected extract rate | Classification focus |
+|--------|----------------------|---------------------|
+| Social posts | 70–90% | Author-curated, most worth extracting |
+| Social replies | 10–15% | Mostly noise, only deep-explanation replies |
+| Transcripts | 40–60% | Skip greetings, repetition, tangents |
+| Articles / papers | 80–95% | Mostly valuable; main filter is topic relevance |
+| Notes / memos | 20–40% | Heavy in action items and fragments |
+| Conversation logs | 15–30% | Extract conclusions and decisions only |
+
+---
+
+## Phase 3: Extract into atoms
+
+**Goal**: turn "extract"-marked segments into standard-format knowledge atoms.
+
+### What is a knowledge atom
+
+A `.md` file with YAML frontmatter (metadata) and a body containing one core claim. Academic framing: Atomic Fact Decomposition — decomposing composite information into the smallest independently verifiable units.
+
+**Atoms are immutable.** Once created, don't edit. If knowledge evolves (view changes, technology updates), create a new atom replacing the old one, and move the old one to `_archive/`. Then recompile affected wiki pages. This mirrors Karpathy's "raw/ is read-only" principle — atoms are our raw layer; wiki is always rebuildable from atoms.
+
+```yaml
+---
+id: branch/descriptive-slug
+type: explanation | opinion | tutorial | myth-busting | case-study | comparison
+depth: beginner | intermediate | advanced
+source_type: post | transcript | article | note | screenshot | audio
+source_ids: []
+reuse_score: high | medium | low
+tags: []
+created: YYYY-MM-DD
+---
+```
+
+### Extraction principles
+
+1. **Extract, don't copy** — store refined knowledge, not original pasted
+2. **One atom, one claim** — a post with three independent views becomes three atoms
+3. **Preserve the author's voice** — personal knowledge differentiation comes from perspective; don't flatten into neutral encyclopedia prose
+4. **Tag sources** — every atom traces back to its raw source
+5. **One atom belongs to one branch** — use tags for related topics
+
+### Judging "extract" vs "copy"
+
+The same raw text, handled two ways:
+
+**Raw** (social post):
+> Yesterday I spent three hours debugging an agent and realized the system prompt was too long — the model was ignoring the second half. Splitting the prompt into three layers — role definition, task rules, current context — fixed it instantly. Don't cram everything into one prompt.
+
+**Bad atom (copying)**:
+```markdown
+# Debug agent experience
+Yesterday I spent three hours debugging an agent and realized the system
+prompt was too long — the model was ignoring the second half. Splitting
+the prompt into three layers — role definition, task rules, current
+context — fixed it instantly. Don't cram everything into one prompt.
+```
+→ This just adds a title to the original. No refinement.
+
+**Good atom (extraction)**:
+```markdown
+# System Prompt Layered Architecture
+
+Long system prompts cause models to ignore later instructions. The fix is
+to split the prompt into three layers:
+
+1. **Role definition** — who you are, core responsibilities
+2. **Task rules** — operational constraints, quality bar
+3. **Current context** — task-specific information
+
+The benefit isn't just avoiding omission — each layer can be updated
+independently. Role definition rarely changes; task rules adjust occasionally;
+context changes every time. Mixed together, any edit forces re-reviewing
+the whole prompt.
+```
+→ Extracted the core knowledge (layered architecture), added an implicit insight (independent update), structured it.
+
+### When to split one segment into multiple atoms
+
+**Test**: if a passage contains two views, and removing one leaves the other intact — split.
+
+**Split example**:
+
+Raw: "Vibe Coding isn't not writing code — it's moving effort from syntax to architecture. Also, after using AI to write code, code review becomes more important than before, because you're not reviewing your own logic anymore."
+
+→ Two atoms:
+1. **What Vibe Coding really is** — effort shifts from syntax to architecture (type: explanation)
+2. **Code Review in the AI era** — reviewing AI's logic, not your own (type: opinion)
+
+**Don't split example**:
+
+Raw: "The three-layer Harness architecture is Persona, Rules, Context. Persona defines the role, Rules define constraints, Context provides current info."
+
+→ Don't split. The three layers are one concept — each is incomplete alone.
+
+### What should not become an atom
+
+These should be caught at classification, but if they slip through, block them at extraction:
+
+- **Pure action items**: "Tomorrow update landing page" → todo, not knowledge
+- **Unannotated restatement**: "OpenAI released GPT-5" → news, unless paired with your analysis
+- **Over-time-sensitive content**: "Claude 3.5 Sonnet is currently strongest" → stale in three months, unless discussing evaluation methodology itself
+- **Pure emotion**: "Exhausting day but satisfying" → journal, not knowledge
+
+### Quality judgment
+
+How to set `reuse_score`:
+- **high** — standalone-usable in a lecture or article, with clear view + support
+- **medium** — valuable perspective but needs companion atoms for complete content
+- **low** — informational, niche use cases
+
+### Batching order
+
+If you have multiple source types, process in this order:
+
+1. **Published content first** — already self-filtered, baseline quality high
+2. **Deep materials next** — supplement published content with technical detail
+3. **Private notes last** — highest judgment cost, prone to low-quality atoms
+
+Build the skeleton first (from public content), add muscle (from depth materials), finish with details (notes). Starting with notes means drowning in details without structure.
+
+### First-batch calibration
+
+After the first batch (~10–20 segments), **human-review**. Check two things:
+1. Did classification miss anything worth extracting?
+2. Is the extraction quality what you want — is voice preserved, is structure good enough?
+
+Calibrate, then let subsequent batches run unattended. Skipping calibration and running large batches = gambling on quality.
+
+---
+
+## Phase 4: Quality pass
+
+**Goal**: clean up the unavoidable issues from extraction.
+
+### Checklist
+
+- [ ] **Dedupe**: the same claim extracted from multiple sources → keep the most complete, archive the rest
+- [ ] **Reclassify**: atom in wrong branch → move, update frontmatter `id`
+- [ ] **Handle bloated branches**: single branch over 30 atoms and naturally splittable → split
+- [ ] **Depth/reuse_score calibration**: batch-extracted atoms often inconsistent on these → normalize
+- [ ] **Gap analysis**: subtopic distribution and depth distribution within each branch
+
+### Three-layer gap analysis
+
+1. **Topic completeness** — what subtopics does each branch cover, what's visibly missing
+2. **Depth gradient** — is beginner/intermediate/advanced distribution reasonable
+3. **Use-case alignment** — does the branch structure cover what your teaching products / content plans need
+
+Not all gaps need filling. Some gaps are real — you genuinely have nothing to say on that subtopic. That's a knowledge boundary, not a task to fill.
+
+### AI's role
+
+Gap analysis is a great AI job — it's good at distribution stats, pattern-finding, cross-comparison. But "is this gap important?" is your call.
+
+---
+
+## Phase 5: External verification + summaries
+
+**Goal**: confirm factual accuracy, produce readable branch summaries.
+
+### External verification
+
+Use WebSearch (or similar) to verify:
+- Are technical claims correct / current
+- Are numeric data points fresh
+- Are you missing important counterpoints
+
+**Principle**: external verification is corroboration and supplement, not replacement. Other people's views are reference; yours is the knowledge base's core value.
+
+### Branch summaries
+
+Each branch produces a `SUMMARY.md`:
+- **Core narrative line** — what this branch is "about"
+- **Atom list** — organized by subtopic × depth
+- **Teaching path suggestions** — which atoms fit which formats
+- **Known gaps** — what still needs filling
+
+This step needs a strong model. Cheap models handle extraction and formatting fine, but "distill a teaching narrative from 60 atoms" needs deeper comprehension.
+
+---
+
+## Phase 6: Wiki compilation
+
+**Goal**: compile scattered atoms into readable wiki pages.
+
+This is the payoff phase. Atoms are parts; wiki pages are products.
+
+### Compilation logic
+
+Not one-atom-per-page. Group by "what a reader wants to understand", combining related atoms into one coherent article.
+
+Example: you have 5 atoms — "What is Harness", "Why Harness matters", "Three challenges of AI collaboration", "Harness vs Agent", "Harness public announcement" — compile into one page: "What is Harness Engineering".
+
+### Format conventions (preconditions for automation)
+
+These conventions make `lint.sh` and `gen-index.sh` work:
+
+1. **Filename rule** — `<branch>-<topic-slug>.md`, all lowercase, hyphens only. Example: `harness-engineering-what-is-harness.md`.
+2. **`[[wiki-link]]` = filename without `.md`** — `[[harness-engineering-what-is-harness]]` maps to `wiki/harness-engineering-what-is-harness.md`. Scripts use this to find ghost links and orphans.
+3. **First line must be `# title`** — `gen-index.sh` reads this for page titles.
+4. **`[[link]]` can appear anywhere in-body** — not restricted to a "see also" section. First mention of a related concept links; subsequent mentions in the same page don't.
+5. **Temporal markers in uniform format** — version as `v3.5`, date as `2025-04`, avoid "current" / "latest" / "now" in time-sensitive contexts, use specific dates (`as of 2025-04`). `lint.sh` regex-checks these.
+
+### Compilation principles
+
+1. **Group by topic, not one-to-one with atoms** — typical wiki page = 3–8 atoms
+2. **Preserve voice** — wiki is opinionated knowledge, not encyclopedia
+3. **Add cross-references** — use `[[wiki-link]]` to build a network
+4. **Tag sources** — footer lists source atoms for traceability
+5. **Length control** — 1500–2500 words per page. Split if longer.
+
+### Wiki page structure
+
+```markdown
+# Page Title
+
+Opening paragraph (why this matters, common misconception)
+
+## Section one
+[Integrated content from multiple atoms, teaching tone, coherent prose]
+
+## Section two
+[Continuation, natural transition]
+
+---
+
+**See also**
+- [[related-page-one]] — one-line description
+- [[related-page-two]] — one-line description
+
+---
+*Compiled from N atoms: atom-a, atom-b, atom-c*
+```
+
+### Global index
+
+Build `index.md` at the repo root (auto-generated by `scripts/gen-index.sh`). Lists all wiki pages, organized by branch, one-line summary each. This is the LLM's entry point for Query — it doesn't read every page, it scans the index to decide which pages to load.
+
+### Change log
+
+`log.md`, append-only. Every Ingest or page update logs an entry. Use `scripts/log-append.sh`.
+
+### AI's role
+
+Compilation is where AI shines. It's good at "synthesize 5 scattered pieces into one structured article". What to give it:
+- Clear voice instructions (teaching style vs reference doc style)
+- Example pages (show what a good wiki page looks like)
+- The branch `SUMMARY.md` (so it understands the narrative line)
+
+---
+
+## Continuous maintenance: three core operations
+
+Wiki isn't done after the first build. Karpathy defined three continuous operations:
+
+### Ingest (new material)
+
+1. New material into `raw/` (or wherever your sources live)
+2. AI reads new material, extracts atoms
+3. Update affected wiki pages (or create new ones)
+4. Run `gen-index.sh` and `log-append.sh`
+
+### Query (knowledge use)
+
+1. Read `index.md` to locate relevant pages
+2. Read pages, synthesize answer
+3. If the answer produces a new worth-keeping synthesis, write it back as an atom
+
+### Lint (periodic audit)
+
+Two layers, run in order.
+
+**Programmatic Lint** (`scripts/lint.sh`): checks ghost links, orphan pages, format violations, outdated markers. Seconds to run. Deterministic. Output: `lint-report.md`.
+
+**LLM Lint**: the AI audits wiki health.
+
+1. **Scope**: LLM reads `index.md` + all wiki pages (not atoms — Lint checks wiki-layer quality)
+2. **Checks**:
+   - **Contradictions** — page A says "X is best practice", page B says "X is deprecated" → flag both, list paths and conflicting segments
+   - **Orphan pages** — no other page `[[wiki-link]]`s to it → add links or merge
+   - **Ghost links** — `[[wiki-link]]` to non-existent page → create page or remove link
+   - **Concept gaps** — multiple pages reference a concept with no dedicated page → flag as candidate new page
+   - **Expired claims** — version numbers, dates, temporal markers in time-sensitive contexts → verify
+3. **Output**: append to `lint-report.md`, sorted by severity (contradictions > ghost links > orphans > concept gaps > expired)
+4. **Action**: decide which to fix, do the edits, run `log-append.sh`
+
+---
+
+## Advanced: graphify and knowledge graphs
+
+If your needs exceed wiki's flat structure, [graphify](https://github.com/safishamsi/graphify) (25k+ stars) takes the graph approach.
+
+### What graphify does
+
+Solves the same problem Karpathy's wiki does — "pile of raw material, structure it" — but with knowledge graphs instead of wiki pages.
+
+Technical highlights:
+- **Three-stage pipeline**: AST parsing → transcription extraction → LLM semantic analysis. Claims 71.5× token savings over direct-to-LLM.
+- **Multimodal**: code, images, video, audio
+- **Topological clustering**: Leiden community detection, not embedding similarity — captures structural relationships, not surface semantic proximity
+- **Three-tier confidence**: EXTRACTED, INFERRED, AMBIGUOUS
+
+### When to use graphify vs wiki
+
+| Scenario | Wiki | graphify |
+|---------|------|----------|
+| Personal knowledge (<200 pages) | ideal | overkill |
+| Large codebase understanding | poor fit | strong fit |
+| Multimodal material (code + docs + video) | need format unification | native support |
+| Interactive visualization | not provided | built-in |
+| Human-readable pages | core value | not the point |
+| Cross-domain link discovery | manual `[[link]]` | automatic |
+
+### Hybrid
+
+Not mutually exclusive. A viable combination:
+1. Use this methodology's Phase 1–5 to build atoms and branch structure
+2. Use Phase 6 to compile human-readable wiki
+3. Feed the same atoms to graphify for a knowledge graph
+
+Wiki answers "what is X"; graph answers "what is X connected to, and what might it be connected to".
+
+---
+
+## Tooling
+
+### Minimum
+
+- An AI coding agent (Claude Code, Cursor, equivalent)
+- A filesystem (atoms and wiki are just `.md` files)
+- That's it
+
+### Advanced
+
+| Tool | Use | Necessity |
+|------|-----|-----------|
+| Obsidian | Browse wiki, graph view for connections | Recommended |
+| MCPVault | Let AI agents read/write Obsidian vault | Recommended with Obsidian |
+| Vector DB | Assist location (past 200 pages) | Large-scale only |
+| graphify | Knowledge graph visualization | Optional, for large-scale or multimodal |
+
+---
+
+## FAQ
+
+### "Is my material volume worth this?"
+
+Depends on how you define "worth". If you have 10 notes, just put them in a folder. If you have 50+ materials and will keep producing, spending an afternoon on structure pays off every time you use the knowledge base afterward. Knowledge bases compound — the earlier you build, the more returns.
+
+### "Must I use YAML frontmatter?"
+
+No. YAML is for batch-processing and statistical analysis by AI. Small knowledge bases don't need it. But at minimum, mark `type` and `tags` — future-you will thank past-you.
+
+### "Is AI-extracted quality good enough?"
+
+Depends on the rules and examples you give. AI extraction without rules = random quality. Rules + 2–3 examples + human-reviewed first few batches = stable acceptable quality. The bottleneck isn't AI intelligence; it's whether you articulated your standards clearly.
+
+### "Compile vs RAG — exclusive choice?"
+
+No. Small-scale use Compile (wiki). Large-scale use hybrid. Compile for core stable high-value knowledge; RAG for one-off long-tail queries.
+
+### "What if knowledge goes stale?"
+
+Lint periodically. Technical knowledge: quarterly Lint. Check:
+- Tool version numbers still correct
+- Technical trends still valid
+- Your own views still hold
+
+View evolution is not a bug. Mark old views as "evolved", preserve context, don't delete. Knowing how you changed is also knowledge.
+
+---
+
+## Reference implementation data
+
+See the `README.md` of this repo for data from the reference implementation (584 posts + 8,668 replies → 630 atoms → 83 wiki pages across 11 branches).
+
+### Lessons from the reference run
+
+- **Reply value is underrated.** Social replies often contain deeper technical detail than posts — because replies happen in concrete problem contexts. But filtering cost is high (87% noise).
+- **Model choice varies by phase.** Extraction (Phase 2–3) fits mid-tier models. Summary (Phase 5) and Compile (Phase 6) need stronger models — synthesizing a narrative from 60 atoms requires depth.
+- **Branch design evolves.** Don't expect v1 to be perfect. Splitting a branch during Phase 4 is normal.
+- **Not all gaps need filling.** Gap analysis will list "theoretically should exist but missing" knowledge points. Some are real gaps; some are just "you have nothing to say here". Don't fill the latter.
+
+---
+
+*This methodology is distilled from a real-world implementation. See the main README for metrics and outcomes.*
+
+
+
+================================================
+FILE: STORY.md
+================================================
+# I ran Karpathy's LLM Wiki. Here's what I learned.
+
+In 2025, Andrej Karpathy pushed out an idea: stop re-searching raw sources every time you query an AI. Pay the token cost once to compile your knowledge into a wiki, then just read the wiki from then on.
+
+He wrote the pattern up as a gist. Ten-thousand-plus stars. But it's an idea file, not an implementation guide. He didn't walk the full path from raw material to finished artifact, and he didn't run the system long enough to hit maintenance problems.
+
+I did.
+
+
+## Scale
+
+Input: 584 social posts, 8,668 replies, plus old lecture materials, course materials, and a pile of prior notes.
+
+Filtered through an LLM against a specific ruleset, the output was 630-odd knowledge atoms — one claim per atom — grouped by topic into 11 branches, then compiled into 83 wiki pages.
+
+Full procedure in METHODOLOGY.md.
+
+
+## When Compile > RAG
+
+Karpathy's claim is that knowledge should be a persistent, compounding artifact, not regenerated on every query. The claim holds, but only under specific conditions.
+
+Volume under 200 wiki pages. Past that, the LLM loses efficiency scanning `index.md` and you need a real search mechanism alongside it.
+
+Knowledge is relatively stable. You're organizing a cognitive map, not breaking news.
+
+A single point of view. It's personal knowledge, not an aggregation of a hundred different voices.
+
+Quality over coverage. 50 pages written tight beat 500 pages written shallow.
+
+If your case doesn't meet these, RAG is probably the better fit. The two don't exclude each other — compile your stable core, RAG the long tail.
+
+
+## Problems he didn't hit
+
+Karpathy defined three maintenance operations: Ingest (add material), Query (look things up), Lint (health check). He never got to the point of actually handling the details.
+
+
+### Lint's signal-to-noise
+
+The first Lint version used a loose regex to catch temporal words — "currently", "latest", "now", "目前". Across 83 pages it produced 47 warnings.
+
+Forty-odd of those were rhetorical uses inside prose, like "you used to need WSL, now you don't". Not stale claims — just how people write. Only 7 were actually worth a second look.
+
+A report that's 85% noise gets opened three times, then ignored forever.
+
+I tightened the pattern to only match temporal words paired with versions or dates — "as of 2025-06", "latest version", "just released". Warnings dropped to 16, every one a real dated claim worth verifying.
+
+There's a deeper point here. Karpathy's wiki leans encyclopedic, so "avoid vague temporal words" is reasonable for him. But a conversational knowledge base will naturally use "now" and "currently" all the time. If you enforce the lint rule hard enough to convert every one of those into "as of 2026-04", the prose stops sounding like a person wrote it. Lint should match your writing style, not overwrite it.
+
+
+### Parallel-compile naming collisions
+
+Karpathy writes alone, one page at a time. No collisions.
+
+Run 11 agents compiling in parallel and the same set of atoms gets two different filenames from two different agents — one calls it `mcp-plus-skills.md`, the other `mcp-plus-skills-architecture.md`.
+
+Fix: pre-lock the slug list before fan-out. Agents fill assigned slugs with content; they don't name files. Any parallel-producer scenario needs namespace coordination up front.
+
+
+### Programmatic Lint vs LLM Lint
+
+Karpathy says Lint should catch contradictions, orphan pages, ghost links, and stale claims. He doesn't split which ones can be automated.
+
+Ghost links, orphan pages, format violations — deterministic problems, handled by a shell script in seconds.
+
+Contradiction detection and staleness judgment need semantic understanding. Those go to the LLM.
+
+Run the script first so the LLM reads a clean document. Without the split, its attention gets eaten by format issues instead of the things actually worth judging.
+
+
+## What came out of it
+
+630+ scattered knowledge points became an 83-page cross-referenced wiki. Finding something is now reading the index. When I ask an AI to help write, I drop the relevant wiki pages in as context. Maintenance is incremental — no rebuild.
+
+The bigger return wasn't the wiki itself. It was seeing my own knowledge map clearly once it was organized — where I thought I was solid but actually had gaps, where my views had gone stale without me noticing, where a topic I assumed mattered turned out to have little to say.
+
+
+## Running it yourself
+
+METHODOLOGY.md has the full procedure. Point an AI at it with your own materials and it can run.
+
+`scripts/` has three scripts: `lint.sh` for health checks, `gen-index.sh` to rebuild the index, `log-append.sh` to append change entries.
+
+---
+
+Built on Andrej Karpathy's [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) pattern, iterated through real-world use.
+
+
+
+================================================
+FILE: atoms/README.md
+================================================
+# atoms/
+
+Knowledge atoms, organized by topic-branch. **Source of truth.**
+
+## Layout
+
+```
+atoms/
+├── README.md                ← you are here
+├── _template.md             ← copy this when creating a new atom
+│
+├── <branch-1>/              ← one folder per topic-branch
+│   ├── 2026-01-15-some-claim.md
+│   ├── 2026-02-03-another-claim.md
+│   ├── _archive/            ← superseded atoms live here
+│   └── ...
+│
+├── <branch-2>/
+│   └── ...
+│
+└── ...
+```
+
+One folder per topic-branch. One file per atom. One claim per file.
+
+See `_template.md` for the frontmatter and body format. See `CLAUDE.md` at the repo root for the full spec.
+
+## Why atoms exist
+
+Karpathy's original LLM Wiki goes `raw → wiki` directly. The atom layer is this repo's main addition — it solves three problems:
+
+1. **Loss of information.** Wiki compilation is lossy. Without atoms, you can't recover what got dropped without re-reading raw.
+2. **False sense of source of truth.** Wiki looks authoritative, but it's a derived artifact. Atoms are the truth; wiki is a cache.
+3. **Provenance.** Every wiki claim should be traceable to atoms, and every atom traceable to raw. Without an atom layer, the chain breaks at the wiki.
+
+When a wiki page is wrong, you fix the underlying atom and recompile. You never patch the wiki directly.
+
+## What's gitignored
+
+Everything in this folder except `README.md`, `_template.md`, and `.gitkeep` is gitignored. Your atoms are personal content; the framework is what gets shared.
+
+
+
+================================================
+FILE: atoms/_template.md
+================================================
+---
+id: <branch>/<descriptive-slug>
+type: explanation
+depth: intermediate
+source_type: post
+source_ids: ["<stable-id-or-url>"]
+reuse_score: medium
+tags: []
+created: YYYY-MM-DD
+---
+
+One-line summary of this atom's core claim.
+
+The body of the atom — refined knowledge, written in your voice, not pasted raw text.
+
+Keep it focused. One claim per atom. If you find yourself making two independent points, split into two atoms.
+
+If the source has nuance worth preserving but tangential to the core claim, summarize it briefly here so the wiki compile step doesn't lose context.
+
+> Original source (optional, for traceability): paste the raw quote or link here
+
+
+
+================================================
+FILE: atoms/.gitkeep
+================================================
+[Empty file]
+
+
+================================================
+FILE: raw/README.md
+================================================
+# raw/
+
+Drop your source materials here.
+
+## What goes in
+
+Anything text-based that you want to extract knowledge from:
+
+- PDFs (after text extraction)
+- Markdown notes
+- Lecture / podcast transcripts
+- Social media post dumps (Threads, X, etc.)
+- Articles, papers
+- Screenshots (after OCR)
+- Audio (after transcription)
+- Email exports
+- Slack / Discord history
+
+Format-wise: prefer plain text or markdown. Binary files (raw PDFs, audio) should be converted to text before landing here, so the LLM can actually read them.
+
+## Folder layout (suggested)
+
+```
+raw/
+├── threads/
+│   ├── 2026-01-posts.md
+│   └── 2026-01-replies.md
+├── lectures/
+│   └── 2026-03-15-skill-design.md
+├── articles/
+│   └── 2026-02-mcp-deep-dive.md
+└── notes/
+    └── ...
+```
+
+Subfolders by source type help during Ingest — the LLM can target one source at a time.
+
+## Rules
+
+- **Read-only from the LLM's perspective.** The LLM extracts atoms from raw but never writes back. If raw needs correction or redaction, do it manually and re-run Ingest.
+- **Stable identifiers.** Each file should have a stable name/path. `source_ids` in atoms reference these.
+- **Whole-content gitignored.** Only this README and `.gitkeep` are tracked. Your raw materials never go to the public repo — that's the whole point.
+
+## Why this layer exists
+
+Karpathy's original LLM Wiki is `raw → wiki` — the LLM reads raw and emits wiki directly. This repo splits that into `raw → atoms → wiki`, with atoms as an intermediate immutable source-of-truth layer.
+
+But raw is still where everything starts. It's the layer the human owns; the LLM just reads from it.
+
+
+
+================================================
+FILE: raw/.gitkeep
+================================================
+[Empty file]
+
+
+================================================
+FILE: scripts/README.md
+================================================
+# scripts/
+
+Three scripts for maintaining the wiki layer. All shell, no dependencies beyond `bash`, `grep`, `sed`, `awk`, `sort`, `wc`.
+
+---
+
+## `gen-index.sh`
+
+Rebuilds `index.md` at the repo root from `wiki/` filenames and first-line titles.
+
+**Usage:**
+```bash
+./scripts/gen-index.sh
+```
+
+**What it does:**
+1. Scans `wiki/*.md`
+2. Groups pages by branch prefix (the part of the filename before the first hyphen)
+3. Reads the first line of each page (must be `# Title`) for display
+4. Writes the grouped, alphabetically-sorted index to `index.md`
+
+**Configuration:**
+
+By default, branches are auto-discovered from filename prefixes and display names are capitalized automatically. If you want to control order and display names (e.g., custom capitalization like "MCP" instead of "Mcp"), edit the `BRANCHES` override array at the top of the script:
+
+```bash
+declare -a BRANCHES=(
+  "harness-engineering|Harness Engineering"
+  "mcp|MCP"
+  "ai-skills|AI Skills"
+  ...
+)
+```
+
+Leave empty (`declare -a BRANCHES=()`) for auto-discovery.
+
+---
+
+## `lint.sh`
+
+Programmatic health check — four deterministic checks, no LLM needed.
+
+**Usage:**
+```bash
+./scripts/lint.sh
+```
+
+**Checks:**
+
+1. **Ghost links** — `[[slug]]` pointing to non-existent wiki pages (→ error)
+2. **Orphan pages** — wiki pages with zero incoming `[[ ]]` links (→ warning)
+3. **Format violations** — first line not `# title`, filename contains uppercase or underscore (→ error)
+4. **Outdated markers** — temporal patterns that need verification (→ warning)
+
+**Output:** `lint-report.md` at the repo root, with counts summary and per-page findings.
+
+**Tuning the outdated-marker regex:**
+
+The default pattern is intentionally tight:
+
+```
+最新版|目前最新|currently v|latest v|just released|剛出|剛推出|截至 [0-9]{4}
+```
+
+Loose patterns (`現在|目前|currently`) produce too many false positives from rhetorical usage. Tight patterns catch actual version/date claims.
+
+If your knowledge base uses different temporal conventions, edit the `PATTERNS` variable in `lint.sh`.
+
+**After programmatic lint passes:** run an LLM Lint pass for semantic checks (contradictions, concept gaps, expired claims). The LLM reads `index.md` + all wiki pages, then appends findings to `lint-report.md`. See `METHODOLOGY.md` for the LLM Lint procedure.
+
+---
+
+## `log-append.sh`
+
+Appends an entry to `log.md` at the repo root.
+
+**Usage:**
+```bash
+./scripts/log-append.sh "description of what changed"
+```
+
+**Example:**
+```bash
+./scripts/log-append.sh "added wiki/harness-engineering-security.md, regenerated index"
+```
+
+**Output format:**
+
+```markdown
+## 2026-04-17
+
+- description of what changed
+```
+
+Newest entries go on top (insert after the `# Wiki Change Log` header). The file is append-only — do not edit past entries.
+
+---
+
+## Run order after any change
+
+```bash
+./scripts/gen-index.sh                    # rebuild index
+./scripts/lint.sh                         # programmatic health check
+./scripts/log-append.sh "what you did"    # record the change
+```
+
+If `lint.sh` reports errors, fix them before the log-append. Warnings can be deferred to an LLM Lint pass.
+
+---
+
+## Making scripts executable
+
+On first clone:
+
+```bash
+chmod +x scripts/*.sh
+```
+
+Windows users: run under Git Bash, WSL, or adapt the scripts to PowerShell.
+
+
+
+================================================
+FILE: scripts/gen-index.sh
+================================================
+#!/bin/bash
+# Auto-generate wiki/index.md from wiki/ filenames + first-line titles.
+# No LLM needed — pure filesystem scan.
+#
+# Branches are auto-discovered by filename prefix (the part before the first hyphen).
+# If you want a fixed branch order or display names, edit the BRANCHES override below.
+
+WIKI_DIR="$(cd "$(dirname "$0")/../wiki" && pwd)"
+INDEX="$WIKI_DIR/../index.md"
+
+# ─── Branch order and display names ───
+# Edit this array for your branches. Leave empty (declare -a BRANCHES=())
+# to auto-discover by filename prefix and capitalize display names automatically.
+#
+# Reference implementation uses these 11 branches in this order:
+declare -a BRANCHES=(
+  "harness-engineering|Harness Engineering"
+  "mcp|MCP"
+  "ai-skills|AI Skills"
+  "vibe-coding|Vibe Coding"
+  "ai-agent|AI Agent"
+  "self-media|Self-Media"
+  "product-business|Product & Business"
+  "claude-code|Claude Code"
+  "context-engineering|Context Engineering"
+  "career-mindset|Career & Mindset"
+  "developer-workflow|Developer Workflow"
+)
+
+# ─── Auto-discover branches if not overridden ───
+if [ ${#BRANCHES[@]} -eq 0 ]; then
+  # Extract branch prefixes from filenames (everything before first hyphen)
+  declare -A SEEN
+  for f in "$WIKI_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    slug=$(basename "$f" .md)
+    [[ "$slug" == "index" || "$slug" == "log" || "$slug" == "_template" || "$slug" == "README" ]] && continue
+    # Branch = filename up to first hyphen
+    branch="${slug%%-*}"
+    if [[ -z "${SEEN[$branch]}" ]]; then
+      SEEN[$branch]=1
+      # Display name = branch with hyphens->spaces and capitalized
+      display=$(echo "$branch" | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)}1')
+      BRANCHES+=("$branch|$display")
+    fi
+  done
+  # Sort branches alphabetically
+  IFS=$'\n' BRANCHES=($(sort <<<"${BRANCHES[*]}"))
+  unset IFS
+fi
+
+# ─── Count pages ───
+PAGE_COUNT=0
+for f in "$WIKI_DIR"/*.md; do
+  [ -f "$f" ] || continue
+  slug=$(basename "$f" .md)
+  [[ "$slug" == "index" || "$slug" == "log" || "$slug" == "_template" || "$slug" == "README" ]] && continue
+  ((PAGE_COUNT++))
+done
+
+# ─── Write header ───
+echo "# Wiki Index" > "$INDEX"
+echo "" >> "$INDEX"
+echo "> Total pages: $PAGE_COUNT" >> "$INDEX"
+echo "> Auto-generated: $(date '+%Y-%m-%d %H:%M')" >> "$INDEX"
+echo "" >> "$INDEX"
+echo "---" >> "$INDEX"
+echo "" >> "$INDEX"
+
+# ─── Write branches ───
+for entry in "${BRANCHES[@]}"; do
+  PREFIX="${entry%%|*}"
+  DISPLAY="${entry##*|}"
+
+  # Find matching files
+  FILES=()
+  for f in "$WIKI_DIR"/${PREFIX}-*.md; do
+    [ -f "$f" ] || continue
+    FILES+=("$f")
+  done
+
+  [ ${#FILES[@]} -eq 0 ] && continue
+
+  echo "## $DISPLAY (${#FILES[@]} pages)" >> "$INDEX"
+  echo "" >> "$INDEX"
+  echo "| Slug | Title |" >> "$INDEX"
+  echo "|------|-------|" >> "$INDEX"
+
+  for f in $(printf '%s\n' "${FILES[@]}" | sort); do
+    slug=$(basename "$f" .md)
+    title=$(head -1 "$f" | sed 's/^# //')
+    echo "| [[$slug]] | $title |" >> "$INDEX"
+  done
+
+  echo "" >> "$INDEX"
+done
+
+echo "Index generated: $PAGE_COUNT pages → $INDEX"
+
+
+
+================================================
+FILE: scripts/lint.sh
+================================================
+#!/bin/bash
+# Wiki Lint - Programmatic Layer
+# 檢查四項：ghost links、orphan pages、format violations、outdated markers
+# 產出 lint-report.md
+
+WIKI_DIR="$(cd "$(dirname "$0")/../wiki" && pwd)"
+REPORT="$WIKI_DIR/../lint-report.md"
+ERRORS=0
+WARNINGS=0
+
+echo "# Wiki Lint Report" > "$REPORT"
+echo "" >> "$REPORT"
+echo "> Generated: $(date '+%Y-%m-%d %H:%M')" >> "$REPORT"
+echo "" >> "$REPORT"
+
+# Collect all wiki slugs (filename without .md)
+declare -A SLUGS
+for f in "$WIKI_DIR"/*.md; do
+  [ -f "$f" ] || continue
+  slug=$(basename "$f" .md)
+  # Skip index and log
+  [[ "$slug" == "index" || "$slug" == "log" ]] && continue
+  SLUGS["$slug"]=1
+done
+
+# ─── 1. Ghost Links ───
+# Find [[links]] that point to non-existent pages
+echo "## 1. Ghost Links（指向不存在頁面的連結）" >> "$REPORT"
+echo "" >> "$REPORT"
+FOUND_GHOST=0
+
+for f in "$WIKI_DIR"/*.md; do
+  [ -f "$f" ] || continue
+  slug=$(basename "$f" .md)
+  [[ "$slug" == "index" || "$slug" == "log" ]] && continue
+
+  # Extract all [[...]] links
+  while IFS= read -r link; do
+    # Strip the display text if present (e.g. [[slug|display]])
+    target="${link%%|*}"
+    if [[ -z "${SLUGS[$target]}" ]]; then
+      echo "- \`$slug\` → \`[[$target]]\` (not found)" >> "$REPORT"
+      FOUND_GHOST=1
+      ((ERRORS++))
+    fi
+  done < <(grep -o '\[\[[^]]*\]\]' "$f" 2>/dev/null | sed 's/^\[\[//;s/\]\]$//')
+done
+
+if [ $FOUND_GHOST -eq 0 ]; then
+  echo "None." >> "$REPORT"
+fi
+echo "" >> "$REPORT"
+
+# ─── 2. Orphan Pages ───
+# Pages with zero incoming links from other wiki pages
+echo "## 2. Orphan Pages（沒有任何頁面連結過來的頁面）" >> "$REPORT"
+echo "" >> "$REPORT"
+FOUND_ORPHAN=0
+
+# Collect all outgoing links
+declare -A INCOMING
+for slug in "${!SLUGS[@]}"; do
+  INCOMING["$slug"]=0
+done
+
+for f in "$WIKI_DIR"/*.md; do
+  [ -f "$f" ] || continue
+  slug=$(basename "$f" .md)
+  [[ "$slug" == "index" || "$slug" == "log" ]] && continue
+
+  while IFS= read -r link; do
+    target="${link%%|*}"
+    if [[ -n "${SLUGS[$target]}" ]]; then
+      INCOMING["$target"]=$(( ${INCOMING[$target]:-0} + 1 ))
+    fi
+  done < <(grep -o '\[\[[^]]*\]\]' "$f" 2>/dev/null | sed 's/^\[\[//;s/\]\]$//')
+done
+
+for slug in $(echo "${!SLUGS[@]}" | tr ' ' '\n' | sort); do
+  if [[ "${INCOMING[$slug]}" == "0" ]]; then
+    echo "- \`$slug\`" >> "$REPORT"
+    FOUND_ORPHAN=1
+    ((WARNINGS++))
+  fi
+done
+
+if [ $FOUND_ORPHAN -eq 0 ]; then
+  echo "None." >> "$REPORT"
+fi
+echo "" >> "$REPORT"
+
+# ─── 3. Format Violations ───
+echo "## 3. Format Violations（格式違規）" >> "$REPORT"
+echo "" >> "$REPORT"
+FOUND_FORMAT=0
+
+for f in "$WIKI_DIR"/*.md; do
+  [ -f "$f" ] || continue
+  slug=$(basename "$f" .md)
+  [[ "$slug" == "index" || "$slug" == "log" ]] && continue
+
+  # 3a. First line must be # title
+  first_line=$(head -1 "$f")
+  if [[ ! "$first_line" =~ ^#\  ]]; then
+    echo "- \`$slug\`: first line is not \`# title\` → \`$first_line\`" >> "$REPORT"
+    FOUND_FORMAT=1
+    ((ERRORS++))
+  fi
+
+  # 3b. Filename must be lowercase with hyphens only
+  if [[ "$slug" =~ [A-Z_] ]]; then
+    echo "- \`$slug\`: filename contains uppercase or underscore" >> "$REPORT"
+    FOUND_FORMAT=1
+    ((ERRORS++))
+  fi
+
+  # 3c. Check for raw URLs in wiki links (should be [[slug]] not [text](url))
+  # This is a soft check — markdown links to external sites are fine
+done
+
+if [ $FOUND_FORMAT -eq 0 ]; then
+  echo "None." >> "$REPORT"
+fi
+echo "" >> "$REPORT"
+
+# ─── 4. Outdated Markers ───
+# Only flag temporal words that carry version/tool-specific claims likely to expire.
+# Generic narrative uses of 現在/目前 (historical contrast, rhetorical) are intentionally excluded.
+echo "## 4. Outdated Markers（時效性用語）" >> "$REPORT"
+echo "" >> "$REPORT"
+FOUND_OUTDATED=0
+
+PATTERNS='最新版|目前最新|currently v|latest v|just released|剛出|剛推出|截至 [0-9]{4}'
+
+for f in "$WIKI_DIR"/*.md; do
+  [ -f "$f" ] || continue
+  slug=$(basename "$f" .md)
+  [[ "$slug" == "index" || "$slug" == "log" ]] && continue
+
+  matches=$(grep -nE "$PATTERNS" "$f" 2>/dev/null)
+  if [ -n "$matches" ]; then
+    echo "### \`$slug\`" >> "$REPORT"
+    echo '```' >> "$REPORT"
+    echo "$matches" >> "$REPORT"
+    echo '```' >> "$REPORT"
+    FOUND_OUTDATED=1
+    ((WARNINGS++))
+  fi
+done
+
+if [ $FOUND_OUTDATED -eq 0 ]; then
+  echo "None." >> "$REPORT"
+fi
+echo "" >> "$REPORT"
+
+# ─── Summary ───
+echo "---" >> "$REPORT"
+echo "" >> "$REPORT"
+echo "**Summary**: $ERRORS errors, $WARNINGS warnings across ${#SLUGS[@]} wiki pages" >> "$REPORT"
+
+echo "Lint complete: $ERRORS errors, $WARNINGS warnings. Report: $REPORT"
+
+
+
+================================================
+FILE: scripts/log-append.sh
+================================================
+#!/bin/bash
+# Append an entry to wiki/log.md
+# Usage: ./log-append.sh "描述這次變更的內容"
+# Example: ./log-append.sh "新增 harness-engineering-security.md，更新 index.md"
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOG="$REPO_ROOT/log.md"
+DATE=$(date '+%Y-%m-%d')
+MESSAGE="${1:-（未提供變更描述）}"
+
+# Create log file if it doesn't exist
+if [ ! -f "$LOG" ]; then
+  echo "# Wiki Change Log" > "$LOG"
+  echo "" >> "$LOG"
+fi
+
+# Append entry (prepend after the header so newest is on top)
+# Strategy: insert after line 2 (after "# Wiki Change Log\n")
+ENTRY="## $DATE\n\n- $MESSAGE\n"
+
+# Use sed to insert after the first blank line (after header)
+sed -i "2a\\
+\\
+## $DATE\\
+\\
+- $MESSAGE" "$LOG"
+
+echo "Log appended: $DATE — $MESSAGE"
+
+
+
+================================================
+FILE: wiki/_template.md
+================================================
+# Page Title
+
+Opening paragraph. Why this matters, common misconception, what the reader will get from this page. Two or three sentences.
+
+---
+
+## First section heading
+
+Integrated content from multiple atoms, written as coherent prose. Not a bulleted dump of atoms — synthesize.
+
+When you first mention a related concept that has its own page, link it: [[other-page-slug]]. Don't repeat the link on subsequent mentions in the same page.
+
+## Second section heading
+
+Continue. Natural transitions. Keep paragraphs tight — one period per paragraph if you can manage it; avoid run-on sentences.
+
+For temporal claims, use specific dates (as of 2026-04) or version numbers (v3.5). Avoid bare "current" / "latest" / "now" — lint will flag them.
+
+## Optional further sections
+
+As needed. Aim for 1500–2500 words total per page. If you cross 2500, consider splitting.
+
+---
+
+**See also**
+- [[related-page-one]] — one-line description of why this is relevant
+- [[related-page-two]] — one-line description
+
+---
+*Compiled from atoms: `branch/atom-slug-1`, `branch/atom-slug-2`, `branch/atom-slug-3`*
+
+
+
+================================================
+FILE: wiki/.gitkeep
+================================================
+[Empty file]
+

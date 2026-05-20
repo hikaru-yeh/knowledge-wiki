@@ -1,0 +1,2577 @@
+Directory structure:
+└── kinggyusuh-gemini-search-cc/
+    ├── README.md
+    ├── CODE_OF_CONDUCT.md
+    ├── CONTRIBUTING.md
+    ├── LICENSE
+    ├── NOTICE
+    ├── package.json
+    ├── SECURITY.md
+    ├── plugins/
+    │   └── gemini/
+    │       ├── settings.json
+    │       ├── agents/
+    │       │   └── researcher.md
+    │       ├── hooks/
+    │       │   ├── guard-filter.mjs
+    │       │   └── hooks.json
+    │       ├── scripts/
+    │       │   ├── gemini-companion.mjs
+    │       │   ├── session-lifecycle-hook.mjs
+    │       │   └── lib/
+    │       │       ├── gemini.mjs
+    │       │       ├── render.mjs
+    │       │       └── workspace.mjs
+    │       ├── skills/
+    │       │   ├── audit/
+    │       │   │   └── SKILL.md
+    │       │   ├── changelog/
+    │       │   │   └── SKILL.md
+    │       │   ├── compare/
+    │       │   │   └── SKILL.md
+    │       │   ├── fact-check/
+    │       │   │   └── SKILL.md
+    │       │   ├── gemini-prompting/
+    │       │   │   └── SKILL.md
+    │       │   ├── research/
+    │       │   │   └── SKILL.md
+    │       │   ├── search/
+    │       │   │   └── SKILL.md
+    │       │   ├── search-result-handling/
+    │       │   │   └── SKILL.md
+    │       │   └── setup/
+    │       │       └── SKILL.md
+    │       └── .claude-plugin/
+    │           └── plugin.json
+    ├── tests/
+    │   ├── companion.test.mjs
+    │   ├── guard.test.mjs
+    │   ├── parse.test.mjs
+    │   └── render.test.mjs
+    ├── .claude-plugin/
+    │   └── marketplace.json
+    └── .github/
+        ├── PULL_REQUEST_TEMPLATE.md
+        ├── ISSUE_TEMPLATE/
+        │   ├── bug_report.yml
+        │   └── feature_request.yml
+        └── workflows/
+            └── ci.yml
+
+================================================
+FILE: README.md
+================================================
+# Gemini Search for Claude Code (gemini-search-cc)
+
+[![CI](https://github.com/KingGyuSuh/gemini-search-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/KingGyuSuh/gemini-search-cc/actions) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+Bring Gemini's **grounded Google Search** capabilities directly into [Claude Code](https://code.claude.com/docs). This plugin turns Claude Code into a search-augmented coding assistant — bridging Claude's knowledge cutoff with real-time, cited web information.
+
+---
+
+## Features
+
+### Skills (Slash Commands)
+
+| Command | Description |
+|---------|-------------|
+| `/gemini:search <query>` | Quick grounded Google Search with citations |
+| `/gemini:research <topic>` | Deep multi-step research with cross-referenced sources |
+| `/gemini:audit <package>` | Security & dependency audit (CVEs, deprecations, breaking changes) |
+| `/gemini:fact-check <claim>` | Verify technical claims against real-time sources |
+| `/gemini:changelog <package>` | Latest release notes, breaking changes, migration guides |
+| `/gemini:compare <a> vs <b>` | Head-to-head technology comparison with live data |
+| `/gemini:setup` | Check Gemini CLI installation and auth status |
+
+### Subagent
+
+- **`gemini:researcher`** — A dedicated research agent that performs iterative searches, synthesizes findings into structured Grounding Reports, and provides strategic advice (Proceed / Update / Pivot / Investigate).
+
+### Auto-Search Guard (Hooks)
+
+Automatically intercepts package manager commands (`npm install`, `pip install`, `cargo add`, etc.) and suggests running a `/gemini:audit` before proceeding.
+
+### Session Lifecycle
+
+The plugin checks Gemini CLI availability at session start. Run `/gemini:setup` to verify authentication.
+
+---
+
+## Repository Structure
+
+```
+gemini-search-cc/
+├── .claude-plugin/
+│   └── marketplace.json             # Marketplace definition
+├── plugins/
+│   └── gemini/                      # Plugin root
+│       ├── .claude-plugin/
+│       │   └── plugin.json          # Plugin manifest
+│       ├── skills/
+│       │   ├── search/SKILL.md
+│       │   ├── research/SKILL.md
+│       │   ├── audit/SKILL.md
+│       │   ├── fact-check/SKILL.md
+│       │   ├── changelog/SKILL.md
+│       │   ├── compare/SKILL.md
+│       │   ├── setup/SKILL.md
+│       │   ├── search-result-handling/SKILL.md
+│       │   └── gemini-prompting/SKILL.md
+│       ├── agents/
+│       │   └── researcher.md
+│       ├── hooks/
+│       │   ├── hooks.json
+│       │   └── guard-filter.mjs
+│       ├── scripts/
+│       │   ├── gemini-companion.mjs
+│       │   ├── session-lifecycle-hook.mjs
+│       │   └── lib/
+│       │       ├── gemini.mjs
+│       │       ├── render.mjs
+│       │       └── workspace.mjs
+│       └── settings.json
+├── tests/
+│   ├── parse.test.mjs
+│   ├── render.test.mjs
+│   ├── guard.test.mjs
+│   └── companion.test.mjs
+├── package.json
+├── LICENSE
+└── NOTICE
+```
+
+## Prerequisites
+
+> **Platform**: macOS and Linux. Windows is not officially supported by Gemini CLI.
+
+1. **Claude Code** — The `claude` CLI ([docs](https://code.claude.com/docs))
+2. **Gemini CLI** — Must be installed and authenticated ([github.com/google/gemini-cli](https://github.com/google-gemini/gemini-cli))
+3. **Node.js** >= 18.0.0
+
+```bash
+# Install Gemini CLI
+npm install -g @google/gemini-cli
+
+# Authenticate
+gemini login
+```
+
+## Installation
+
+### Via Marketplace (recommended)
+
+1. Start Claude Code:
+   ```bash
+   claude
+   ```
+
+2. Inside the Claude Code session, run:
+   ```
+   /plugin marketplace add KingGyuSuh/gemini-search-cc
+   /plugin install gemini@gemini-search
+   ```
+
+### Via --plugin-dir (development)
+
+```bash
+claude --plugin-dir ./plugins/gemini
+```
+
+## Usage
+
+### Quick Search
+```
+/gemini:search "What are the latest breaking changes in React 19?"
+```
+
+### Deep Research
+```
+/gemini:research "Compare Bun vs Deno vs Node.js performance benchmarks 2026"
+```
+
+### Fact-Check
+```
+/gemini:fact-check "React 19 removed forwardRef"
+```
+
+### Changelog
+```
+/gemini:changelog "next@15"
+```
+
+### Compare
+```
+/gemini:compare "Bun vs Deno"
+```
+
+### Security Audit
+```
+/gemini:audit "lodash 4.17.21"
+```
+
+### Setup Check
+```
+/gemini:setup
+```
+
+The **Auto-Search Guard** activates automatically when you run package install commands:
+```
+> npm install some-package
+# [Gemini JavaScript/TypeScript Guard] suggests running /gemini:audit first
+```
+
+---
+
+## Development
+
+```bash
+# Lint all scripts
+npm run lint
+
+# Run unit tests (no auth required)
+npm test
+
+# Run integration tests (requires Gemini CLI auth)
+npm run test:integration
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for details.
+
+## Notice
+
+This is an unofficial plugin and is not affiliated with Anthropic or Google. It requires the Gemini CLI to be configured on your machine.
+
+
+
+================================================
+FILE: CODE_OF_CONDUCT.md
+================================================
+# Contributor Covenant Code of Conduct
+
+## Our Pledge
+
+We as members, contributors, and leaders pledge to make participation in our
+community a harassment-free experience for everyone, regardless of age, body
+size, visible or invisible disability, ethnicity, sex characteristics, gender
+identity and expression, level of experience, education, socio-economic status,
+nationality, personal appearance, race, caste, color, religion, or sexual
+identity and orientation.
+
+We pledge to act and interact in ways that contribute to an open, welcoming,
+diverse, inclusive, and healthy community.
+
+## Our Standards
+
+Examples of behavior that contributes to a positive environment for our
+community include:
+
+* Demonstrating empathy and kindness toward other people
+* Being respectful of differing opinions, viewpoints, and experiences
+* Giving and gracefully accepting constructive feedback
+* Accepting responsibility and apologizing to those affected by our mistakes,
+  and learning from the experience
+* Focusing on what is best not just for us as individuals, but for the overall
+  community
+
+Examples of unacceptable behavior include:
+
+* The use of sexualized language or imagery, and sexual attention or advances of
+  any kind
+* Trolling, insulting or derogatory comments, and personal or political attacks
+* Public or private harassment
+* Publishing others' private information, such as a physical or email address,
+  without their explicit permission
+* Other conduct which could reasonably be considered inappropriate in a
+  professional setting
+
+## Enforcement Responsibilities
+
+Community leaders are responsible for clarifying and enforcing our standards of
+acceptable behavior and will take appropriate and fair corrective action in
+response to any behavior that they deem inappropriate, threatening, offensive,
+or harmful.
+
+
+
+================================================
+FILE: CONTRIBUTING.md
+================================================
+# Contributing to Gemini Search for Claude Code
+
+First off, thank you for considering contributing to Gemini Search for Claude Code! It's people like you that make open source such a great community.
+
+## Development Environment Setup
+
+1. **Prerequisites:**
+   - Node.js (18, 20, or 22)
+   - npm or yarn
+   - [Gemini CLI](https://github.com/google-gemini/gemini-cli) installed and authenticated.
+
+2. **Clone the repository:**
+   ```bash
+   git clone https://github.com/KingGyuSuh/gemini-search-cc.git
+   cd gemini-search-cc
+   ```
+
+3. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+4. **Testing locally:**
+   You can test your local changes directly in Claude Code by pointing it to your local directory:
+   ```bash
+   claude --plugin-dir /path/to/gemini-search-cc/plugins/gemini
+   ```
+
+## Pull Request Process
+
+1. Ensure any install or build dependencies are removed before the end of the layer when doing a build.
+2. Update the README.md with details of changes to the interface, if applicable.
+3. Add or update unit tests to verify your changes (`npm test`).
+4. Ensure your code passes all linting rules (`npm run lint`).
+5. Your PR will be reviewed by the maintainers. Once approved, it will be merged.
+
+## Code of Conduct
+
+By participating in this project, you are expected to uphold our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+
+
+================================================
+FILE: LICENSE
+================================================
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+
+================================================
+FILE: NOTICE
+================================================
+Gemini Search for Claude Code (gemini-search-cc)
+Copyright 2026 KingGyuSuh
+
+This product uses the Gemini CLI (https://github.com/google-gemini/gemini-cli),
+licensed under the Apache License 2.0, Copyright Google.
+
+Plugin architecture inspired by codex-plugin-cc
+(https://github.com/openai/codex-plugin-cc),
+licensed under the Apache License 2.0, Copyright OpenAI.
+
+Built on the Claude Code plugin system by Anthropic.
+
+
+
+================================================
+FILE: package.json
+================================================
+{
+  "name": "gemini-search-cc",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Real-time Google Search, fact-checking, changelog tracking & deep research plugin for Claude Code — powered by Gemini CLI.",
+  "license": "Apache-2.0",
+  "author": "KingGyuSuh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KingGyuSuh/gemini-search-cc.git"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "gemini",
+    "search",
+    "google-search",
+    "grounded-search",
+    "deep-research",
+    "plugin"
+  ],
+  "scripts": {
+    "lint": "node --check plugins/gemini/scripts/gemini-companion.mjs plugins/gemini/scripts/session-lifecycle-hook.mjs plugins/gemini/scripts/lib/gemini.mjs plugins/gemini/scripts/lib/render.mjs plugins/gemini/scripts/lib/workspace.mjs plugins/gemini/hooks/guard-filter.mjs",
+    "test": "npm run lint && node --test tests/*.test.mjs",
+    "test:integration": "node plugins/gemini/scripts/gemini-companion.mjs setup --json && node plugins/gemini/scripts/gemini-companion.mjs search test"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
+
+
+================================================
+FILE: SECURITY.md
+================================================
+# Security Policy
+
+## Supported Versions
+
+Currently, only the latest release of the project is actively supported with security updates.
+
+| Version | Supported          |
+| ------- | ------------------ |
+| 1.0.x   | :white_check_mark: |
+| < 1.0   | :x:                |
+
+## Reporting a Vulnerability
+
+Please **do not** report security vulnerabilities through public GitHub issues.
+
+If you believe you have found a security vulnerability, please report it via email to the maintainer. We will acknowledge receipt of your vulnerability report as soon as possible and strive to send you regular updates about our progress.
+
+If you have not received a reply to your email within 48 hours, or have not heard from the security team for the past 5 days, please follow up with another email.
+
+
+
+================================================
+FILE: plugins/gemini/settings.json
+================================================
+{}
+
+
+
+================================================
+FILE: plugins/gemini/agents/researcher.md
+================================================
+---
+description: A specialized agent for deep technical research, real-time fact-checking, and security auditing via Gemini's grounded Google Search.
+---
+# Gemini Researcher Agent
+
+You are a strategic research assistant integrated into Claude Code. Your primary purpose is to bridge Claude's training data cutoff with **real-time information from the web** using Gemini's grounded Google Search.
+
+## When You Are Invoked
+
+The main Claude agent or user delegates research tasks to you when:
+- Current, real-time information is needed (post-training-cutoff)
+- A technology decision requires up-to-date risk assessment
+- Security vulnerabilities or deprecation status must be verified
+- Multiple sources need cross-referencing before proceeding
+
+## Research Protocol
+
+### Step 1 — Analyze the Request
+Identify:
+- Key technologies, libraries, APIs, or packages involved
+- The user's goal (evaluating, migrating, adopting, debugging)
+- What kind of information is most valuable (versions, CVEs, alternatives, migration guides)
+
+### Step 2 — Choose the Right Tool
+Select the most appropriate Gemini skill for each sub-question:
+
+| Need | Skill | When to use |
+|------|-------|-------------|
+| General info | `/gemini:search` | Broad queries, current state, latest news |
+| Verify a claim | `/gemini:fact-check` | When you encounter a specific assertion to verify |
+| Release info | `/gemini:changelog` | Version history, breaking changes, migration guides |
+| Tech decision | `/gemini:compare` | Head-to-head evaluation of two options |
+| Security check | `/gemini:audit` | CVEs, vulnerabilities, deprecated packages |
+| Deep dive | `/gemini:research` | Complex topics needing multi-step investigation |
+
+### Step 3 — Execute Multi-Step Search
+**Search iteratively** — do not try to answer everything in one query.
+
+Recommended search sequence:
+1. **Baseline:** `/gemini:search "<technology> latest stable version"` — establish current state
+2. **Risk scan:** `/gemini:audit "<technology>"` — check for known CVEs and deprecations
+3. **Breaking changes:** `/gemini:changelog "<technology>"` — identify upgrade risks
+4. **Alternatives:** `/gemini:compare "<technology> vs <alternative>"` — find modern options (only if relevant)
+
+### Step 4 — Synthesize into Grounding Report
+
+Structure your report as follows:
+
+```
+## Grounding Report: <Topic>
+
+### Status: <Recommended | Caution | Deprecated | Critical Risk>
+
+### Findings
+
+| Area | Detail | Source |
+|------|--------|--------|
+| Current Version | ... | [source] |
+| Known CVEs | ... | [source] |
+| Breaking Changes | ... | [source] |
+| Alternatives | ... | [source] |
+
+### Strategic Advice
+<One clear recommendation: Proceed / Update First / Pivot to Alternative / Investigate Further>
+
+### Citations
+<List all sources from search results>
+```
+
+## Constraints
+
+- **Always cite sources.** Never present search-derived facts without attribution.
+- **Do not hallucinate citations.** Only cite URLs and sources that appeared in Gemini's search output.
+- **Be precise about versions.** Say "v4.2.1" not "the latest version."
+- **Err on the side of caution.** If a search is ambiguous, recommend further investigation rather than giving an all-clear.
+- **Do not generate code** unless explicitly asked. Your role is research, not implementation.
+- **Return the Gemini output verbatim** where possible. Add analysis around it, not instead of it.
+- **Focus on actionable intelligence.** The user needs to make a decision — help them do that.
+
+## Tools Available
+- `/gemini:search` — Quick grounded Google Search
+- `/gemini:research` — Deep multi-step research (5 min timeout)
+- `/gemini:audit` — Security & dependency audit
+- `/gemini:fact-check` — Verify technical claims against live sources
+- `/gemini:changelog` — Latest release notes and breaking changes
+- `/gemini:compare` — Head-to-head technology comparison
+
+
+
+================================================
+FILE: plugins/gemini/hooks/guard-filter.mjs
+================================================
+import fs from 'node:fs';
+
+// Read stdin from Claude Code hook system
+const input = JSON.parse(fs.readFileSync(0, 'utf-8'));
+const command = (input.tool_input?.command || '').trim();
+const commandLower = command.toLowerCase();
+
+// Only intercept package install/add commands where audit is genuinely useful.
+// Excludes infrastructure tools (docker, terraform, kubectl), scaffolding (npx, create),
+// and niche ecosystems to avoid alert fatigue.
+const ecosystems = [
+  { name: 'JavaScript/TypeScript', managers: ['npm', 'yarn', 'pnpm', 'bun'], keywords: ['install', 'add', 'update', 'upgrade'] },
+  { name: 'Python', managers: ['pip', 'pip3', 'poetry', 'uv', 'conda', 'pipenv', 'pdm'], keywords: ['install', 'add', 'update', 'upgrade'] },
+  { name: 'Rust', managers: ['cargo'], keywords: ['add', 'install'] },
+  { name: 'Go', managers: ['go'], keywords: ['get', 'install'] },
+  { name: 'PHP', managers: ['composer'], keywords: ['require', 'install', 'update'] },
+  { name: 'Ruby', managers: ['gem', 'bundle', 'bundler'], keywords: ['install', 'add', 'update'] },
+  { name: 'System', managers: ['brew', 'apt', 'apt-get'], keywords: ['install'] },
+];
+
+let detected = null;
+
+for (const eco of ecosystems) {
+  const matchesManager = eco.managers.some(
+    (m) => commandLower.startsWith(m + ' ') || commandLower === m,
+  );
+  if (!matchesManager) continue;
+
+  const matchesKeyword = eco.keywords.some((k) => commandLower.includes(k));
+  if (!matchesKeyword) continue;
+
+  detected = eco.name;
+  break;
+}
+
+if (detected) {
+  // Extract the likely package name(s) from the command for a more targeted suggestion
+  const parts = command.split(/\s+/);
+  const filtered = parts.filter(
+    (p) => !p.startsWith('-') && !p.startsWith('/') && p.length > 1,
+  );
+  const packages = filtered.slice(2).join(', ') || '(packages in command)';
+
+  console.log(
+    JSON.stringify({
+      type: 'prompt',
+      prompt:
+        `[Gemini ${detected} Guard] About to run: \`${command}\`\n` +
+        `Consider running \`/gemini:audit ${packages}\` to check for known vulnerabilities, ` +
+        `deprecated patterns, or breaking changes before proceeding.`,
+    }),
+  );
+} else {
+  // No match — allow the command to proceed without prompt
+  console.log(JSON.stringify({}));
+}
+
+
+
+================================================
+FILE: plugins/gemini/hooks/hooks.json
+================================================
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-filter.mjs\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs\" SessionStart",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs\" SessionEnd",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+
+
+
+================================================
+FILE: plugins/gemini/scripts/gemini-companion.mjs
+================================================
+#!/usr/bin/env node
+
+/**
+ * gemini-companion.mjs — Main CLI entry point bridging Claude Code to Gemini CLI.
+ *
+ * Subcommands:
+ *   search <query>      — Quick grounded Google Search
+ *   research <query>    — Deep multi-step research
+ *   audit <query>       — Security & dependency audit search
+ *   factcheck <claim>   — Fact-check a technical claim
+ *   changelog <package> — Latest release notes
+ *   compare <a> vs <b>  — Technology comparison
+ *   setup               — Health check for Gemini CLI
+ */
+
+import {
+  geminiSearch, geminiResearch, geminiFactCheck,
+  geminiChangelog, geminiCompare, healthCheck,
+} from './lib/gemini.mjs';
+import { renderReport, renderError, renderHealthCheck } from './lib/render.mjs';
+import { getWorkspaceContext } from './lib/workspace.mjs';
+
+const [subcommand, ...rest] = process.argv.slice(2);
+const query = rest.join(' ');
+
+async function main() {
+  switch (subcommand) {
+    case 'search': {
+      if (!query) {
+        console.error('Usage: gemini-companion.mjs search <query>');
+        process.exit(1);
+      }
+      const result = await geminiSearch(query);
+      if (result.ok) {
+        console.log(renderReport({ query, output: result.output, mode: 'search', stats: result.stats }));
+      } else {
+        console.error(renderError(result.error, {
+          exitCode: result.exitCode,
+          suggestion: 'Check that Gemini CLI is installed and authenticated (`gemini login`).',
+        }));
+        process.exit(1);
+      }
+      break;
+    }
+
+    case 'research': {
+      if (!query) {
+        console.error('Usage: gemini-companion.mjs research <query>');
+        process.exit(1);
+      }
+      const result = await geminiResearch(query);
+      if (result.ok) {
+        console.log(renderReport({ query, output: result.output, mode: 'research', stats: result.stats }));
+      } else {
+        console.error(renderError(result.error, {
+          exitCode: result.exitCode,
+          suggestion: 'Deep research requires a stable connection. Try again or use `search` for a quicker lookup.',
+        }));
+        process.exit(1);
+      }
+      break;
+    }
+
+    case 'audit': {
+      if (!query) {
+        console.error('Usage: gemini-companion.mjs audit <query>');
+        process.exit(1);
+      }
+      const ctx = getWorkspaceContext();
+      const ecosystemHint = ctx.ecosystems.length
+        ? `\nProject ecosystem: ${ctx.ecosystems.join(', ')}`
+        : '';
+      const auditPrompt = [
+        'Perform a security and compatibility audit for the following:',
+        '',
+        query,
+        ecosystemHint,
+        '',
+        'Check for:',
+        '1. Known CVEs and security vulnerabilities',
+        '2. Deprecated APIs or packages',
+        '3. Breaking changes in recent versions',
+        '4. Recommended secure alternatives',
+        '5. License compatibility concerns',
+        '',
+        'Provide a structured report with severity levels (Critical/High/Medium/Low).',
+      ].join('\n');
+
+      const result = await geminiSearch(auditPrompt, { timeout: 300_000 });
+      if (result.ok) {
+        console.log(renderReport({ query, output: result.output, mode: 'audit', stats: result.stats }));
+      } else {
+        console.error(renderError(result.error, { exitCode: result.exitCode }));
+        process.exit(1);
+      }
+      break;
+    }
+
+    case 'factcheck': {
+      if (!query) {
+        console.error('Usage: gemini-companion.mjs factcheck <claim>');
+        process.exit(1);
+      }
+      const result = await geminiFactCheck(query);
+      if (result.ok) {
+        console.log(renderReport({ query, output: result.output, mode: 'factcheck', stats: result.stats }));
+      } else {
+        console.error(renderError(result.error, {
+          exitCode: result.exitCode,
+          suggestion: 'Try rephrasing the claim as a specific, verifiable statement.',
+        }));
+        process.exit(1);
+      }
+      break;
+    }
+
+    case 'changelog': {
+      if (!query) {
+        console.error('Usage: gemini-companion.mjs changelog <package[@version]>');
+        process.exit(1);
+      }
+      const result = await geminiChangelog(query);
+      if (result.ok) {
+        console.log(renderReport({ query, output: result.output, mode: 'changelog', stats: result.stats }));
+      } else {
+        console.error(renderError(result.error, {
+          exitCode: result.exitCode,
+          suggestion: 'Check the package name spelling or try searching on npm/PyPI directly.',
+        }));
+        process.exit(1);
+      }
+      break;
+    }
+
+    case 'compare': {
+      if (!query) {
+        console.error('Usage: gemini-companion.mjs compare <tech-a> vs <tech-b>');
+        process.exit(1);
+      }
+      const result = await geminiCompare(query);
+      if (result.ok) {
+        console.log(renderReport({ query, output: result.output, mode: 'compare', stats: result.stats }));
+      } else {
+        console.error(renderError(result.error, {
+          exitCode: result.exitCode,
+          suggestion: 'Try a more specific comparison, e.g., "Bun vs Deno for CLI tools".',
+        }));
+        process.exit(1);
+      }
+      break;
+    }
+
+    case 'setup': {
+      const jsonMode = rest.includes('--json');
+      const status = healthCheck();
+      if (jsonMode) {
+        console.log(JSON.stringify(status));
+      } else {
+        console.log(renderHealthCheck(status));
+      }
+      if (!status.installed || !status.loggedIn) process.exit(1);
+      break;
+    }
+
+    default:
+      console.error(
+        'Unknown subcommand. Usage:\n' +
+        '  gemini-companion.mjs search <query>\n' +
+        '  gemini-companion.mjs research <query>\n' +
+        '  gemini-companion.mjs audit <query>\n' +
+        '  gemini-companion.mjs factcheck <claim>\n' +
+        '  gemini-companion.mjs changelog <package[@version]>\n' +
+        '  gemini-companion.mjs compare <tech-a> vs <tech-b>\n' +
+        '  gemini-companion.mjs setup [--json]'
+      );
+      process.exit(1);
+  }
+}
+
+main().catch((err) => {
+  console.error(renderError(err.message));
+  process.exit(1);
+});
+
+
+
+================================================
+FILE: plugins/gemini/scripts/session-lifecycle-hook.mjs
+================================================
+#!/usr/bin/env node
+
+/**
+ * Session lifecycle hook for Gemini plugin.
+ *
+ * SessionStart — verify Gemini CLI availability, export session env vars,
+ *                and print a brief status notification.
+ * SessionEnd   — placeholder for future cleanup.
+ */
+
+import { appendFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { isGeminiInstalled, getGeminiVersion } from './lib/gemini.mjs';
+
+const event = process.argv[2]; // "SessionStart" or "SessionEnd"
+
+/**
+ * Append an environment variable export to CLAUDE_ENV_FILE so it is
+ * available to all subsequent tool invocations in this session.
+ */
+function appendEnvVar(name, value) {
+  const envFile = process.env.CLAUDE_ENV_FILE;
+  if (!envFile) return;
+  const escaped = value.replace(/'/g, "'\\''");
+  appendFileSync(envFile, `export ${name}='${escaped}'\n`);
+}
+
+if (event === 'SessionStart') {
+  // Generate and export a session ID for state tracking
+  const sessionId = `gemini-${randomUUID().slice(0, 8)}`;
+  appendEnvVar('GEMINI_PLUGIN_SESSION_ID', sessionId);
+
+  // Export plugin data dir if available
+  if (process.env.CLAUDE_PLUGIN_DATA) {
+    appendEnvVar('GEMINI_PLUGIN_DATA', process.env.CLAUDE_PLUGIN_DATA);
+  }
+
+  const installed = isGeminiInstalled();
+  if (installed) {
+    const version = getGeminiVersion();
+    // Note: we cannot run a real auth probe here (5s hook timeout).
+    // Report CLI presence only; auth is verified on first actual use or via /gemini:setup.
+    const msg = `[Gemini plugin] Gemini CLI ${version || '(unknown)'} found. Run /gemini:setup to verify auth.`;
+    console.log(JSON.stringify({ type: 'notification', message: msg }));
+  } else {
+    console.log(JSON.stringify({
+      type: 'notification',
+      message: '[Gemini plugin] Warning: Gemini CLI not found. Run `/gemini:setup` for help.',
+    }));
+  }
+} else if (event === 'SessionEnd') {
+  // Placeholder for future cleanup (e.g., temp file removal, session state)
+  console.log(JSON.stringify({}));
+} else {
+  console.log(JSON.stringify({}));
+}
+
+
+
+================================================
+FILE: plugins/gemini/scripts/lib/gemini.mjs
+================================================
+/**
+ * Gemini CLI detection, health check, and execution utilities.
+ */
+
+import { execFile, execSync } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
+/** Exit-code-specific error messages from Gemini CLI. */
+const EXIT_MESSAGES = {
+  42: 'Invalid input — check your prompt or update Gemini CLI to the latest version.',
+  53: 'Turn limit exceeded. Try a shorter or simpler query.',
+};
+
+/** Check if `gemini` CLI is available on PATH. */
+export function isGeminiInstalled() {
+  try {
+    execSync('which gemini', { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Get Gemini CLI version string, or null if unavailable. */
+export function getGeminiVersion() {
+  try {
+    return execSync('gemini --version', { encoding: 'utf-8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verify Gemini auth is actually valid by running a minimal headless probe.
+ * Gemini CLI cold starts can be slow, so we allow up to 60s.
+ */
+export function isGeminiAuthValid() {
+  try {
+    execSync('gemini -p "ping" -o json', {
+      encoding: 'utf-8',
+      timeout: 60_000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parse Gemini CLI JSON output, extracting response, error, and stats fields.
+ * @param {string} str - Raw string that may contain JSON.
+ * @returns {{ response: string|null, error: string|null, stats: object|null }}
+ */
+export function parseGeminiOutput(str) {
+  if (!str?.trim()) return { response: null, error: null, stats: null };
+  try {
+    const parsed = JSON.parse(str.trim());
+    // error can be a string or an object per Gemini headless docs
+    let error = null;
+    if (typeof parsed.error === 'string') {
+      error = parsed.error;
+    } else if (parsed.error && typeof parsed.error === 'object') {
+      error = parsed.error.message || JSON.stringify(parsed.error);
+    }
+    return {
+      response: typeof parsed.response === 'string' ? parsed.response : null,
+      error,
+      stats: parsed.stats ?? null,
+    };
+  } catch {
+    return { response: null, error: null, stats: null };
+  }
+}
+
+/**
+ * Execute a Gemini grounded search via headless mode (-p flag).
+ * Uses --approval-mode=yolo to auto-approve tool calls like Google Search.
+ * Uses -o json to get structured output.
+ * @param {string} query - The search query.
+ * @param {object} [opts]
+ * @param {number} [opts.timeout=180000] - Timeout in ms (default 3 min).
+ * @param {boolean} [opts.searchHint=true] - Prepend a hint to use Google Search.
+ * @returns {Promise<{ok: boolean, output: string, error?: string, exitCode?: number, stats?: object}>}
+ */
+export async function geminiSearch(query, opts = {}) {
+  const { timeout = 180_000, searchHint = true } = opts;
+
+  const prompt = searchHint
+    ? `Use Google Search to find up-to-date information. ${query}`
+    : query;
+
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      'gemini',
+      ['-p', prompt, '--approval-mode=yolo', '-o', 'json'],
+      { timeout, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 },
+    );
+
+    // Gemini writes JSON to stdout; stderr has status messages.
+    // Try stdout first, then stderr (some edge cases write JSON to stderr).
+    const out = parseGeminiOutput(stdout);
+    const outFb = parseGeminiOutput(stderr);
+    const response = out.response ?? outFb.response;
+    const apiError = out.error ?? outFb.error;
+    const stats = out.stats ?? outFb.stats;
+
+    if (apiError && !response) {
+      return { ok: false, output: '', error: apiError, stats };
+    }
+    if (response !== null) {
+      // Guard against empty response string (e.g., quota exhaustion returning "")
+      if (!response.trim()) {
+        return { ok: false, output: '', error: 'Gemini returned an empty response. This may be due to API quota limits — try again shortly.', stats };
+      }
+      return { ok: true, output: response, stats };
+    }
+
+    // No parseable JSON — return whatever raw text we have
+    const raw = (stdout || stderr).trim();
+    if (raw) return { ok: true, output: raw };
+    return { ok: false, output: '', error: 'Gemini returned empty output' };
+  } catch (err) {
+    if (err.killed) {
+      return { ok: false, output: '', error: `Timeout after ${timeout / 1000}s` };
+    }
+
+    // Try structured JSON extraction first
+    const out = parseGeminiOutput(err.stdout);
+    const outFb = parseGeminiOutput(err.stderr);
+    const response = out.response ?? outFb.response;
+    const apiError = out.error ?? outFb.error;
+    const stats = out.stats ?? outFb.stats;
+
+    // If we got a valid response despite non-zero exit, return it
+    if (response !== null) {
+      return { ok: true, output: response, stats };
+    }
+    // Use structured API error if available
+    if (apiError) {
+      return { ok: false, output: '', error: apiError, exitCode: err.code, stats };
+    }
+    // Map known exit codes to helpful messages
+    const exitMsg = EXIT_MESSAGES[err.code];
+    if (exitMsg) {
+      return { ok: false, output: '', error: exitMsg, exitCode: err.code };
+    }
+
+    // Fall back to raw text or generic error
+    if (err.stdout?.trim()) {
+      return { ok: true, output: err.stdout.trim() };
+    }
+    return { ok: false, output: '', error: err.stderr || err.message, exitCode: err.code };
+  }
+}
+
+/**
+ * Execute a Gemini deep research query (longer timeout, richer prompt).
+ * @param {string} query
+ * @param {object} [opts]
+ * @param {number} [opts.timeout=600000] - Timeout in ms (default 10 min).
+ * @returns {Promise<{ok: boolean, output: string, error?: string, exitCode?: number, stats?: object}>}
+ */
+export async function geminiResearch(query, opts = {}) {
+  const { timeout = 600_000 } = opts;
+
+  const researchPrompt = [
+    'You are a deep research assistant. Perform a thorough, multi-step investigation.',
+    'Use Google Search multiple times if needed to cross-reference sources.',
+    'Provide a comprehensive report with citations.',
+    '',
+    `Research topic: ${query}`,
+  ].join('\n');
+
+  return geminiSearch(researchPrompt, {
+    timeout,
+    searchHint: false,
+  });
+}
+
+/**
+ * Fact-check a technical claim using grounded Google Search.
+ * @param {string} claim - The claim to verify.
+ * @param {object} [opts]
+ * @param {number} [opts.timeout=120000]
+ * @returns {Promise<{ok: boolean, output: string, error?: string, exitCode?: number, stats?: object}>}
+ */
+export async function geminiFactCheck(claim, opts = {}) {
+  const { timeout = 180_000 } = opts;
+
+  const prompt = [
+    'You are a technical fact-checker. Verify the following claim using Google Search.',
+    'Search for authoritative sources (official docs, GitHub, RFCs, CVE databases).',
+    '',
+    'Structure your response as:',
+    '## Verdict: [Confirmed / Partially True / Misleading / False / Unverifiable]',
+    '## Evidence',
+    '- List each piece of supporting or contradicting evidence with its source URL',
+    '## Correct Information',
+    '- If the claim is wrong or misleading, state the accurate information here',
+    '',
+    `Claim to verify: "${claim}"`,
+  ].join('\n');
+
+  return geminiSearch(prompt, { timeout, searchHint: false });
+}
+
+/**
+ * Get latest changelog and release notes for a package.
+ * @param {string} pkg - Package name, optionally with version (e.g., "react@19" or "express").
+ * @param {object} [opts]
+ * @param {number} [opts.timeout=120000]
+ * @returns {Promise<{ok: boolean, output: string, error?: string, exitCode?: number, stats?: object}>}
+ */
+export async function geminiChangelog(pkg, opts = {}) {
+  const { timeout = 180_000 } = opts;
+
+  const prompt = [
+    `Search for the latest release notes and changelog for: ${pkg}`,
+    '',
+    'Search these sources in order of priority:',
+    '1. Official GitHub releases page',
+    '2. Package registry (npm, PyPI, crates.io, pkg.go.dev)',
+    '3. Official documentation or blog announcements',
+    '',
+    'Structure your response as:',
+    '## Latest Version',
+    '- Version number and release date',
+    '## Highlights',
+    '- Key new features or improvements',
+    '## Breaking Changes',
+    '- Any breaking changes that require migration (or "None" if none)',
+    '## Migration Notes',
+    '- Steps needed to upgrade from the previous major version',
+    '## Links',
+    '- Direct URLs to the changelog and release notes',
+  ].join('\n');
+
+  return geminiSearch(prompt, { timeout, searchHint: false });
+}
+
+/**
+ * Compare two technologies with real-time data.
+ * @param {string} query - Comparison query (e.g., "Bun vs Deno").
+ * @param {object} [opts]
+ * @param {number} [opts.timeout=180000]
+ * @returns {Promise<{ok: boolean, output: string, error?: string, exitCode?: number, stats?: object}>}
+ */
+export async function geminiCompare(query, opts = {}) {
+  const { timeout = 300_000 } = opts;
+
+  const prompt = [
+    `Compare the following technologies using current (2025-2026) data: ${query}`,
+    '',
+    'Search for recent benchmarks, adoption statistics, and community sentiment.',
+    '',
+    'Structure your response as:',
+    '## Overview',
+    '- Brief description of each technology',
+    '## Comparison',
+    '| Criteria | Option A | Option B |',
+    '|----------|----------|----------|',
+    '| Performance | ... | ... |',
+    '| Ecosystem / Community | ... | ... |',
+    '| Learning Curve | ... | ... |',
+    '| Production Readiness | ... | ... |',
+    '| Active Maintenance | ... | ... |',
+    '## Concrete Metrics',
+    '- GitHub stars, npm weekly downloads, benchmark numbers (cite sources)',
+    '## When to Choose Each',
+    '- Specific scenarios where each option excels',
+    '## Recommendation',
+    '- Context-dependent recommendation with reasoning',
+  ].join('\n');
+
+  return geminiSearch(prompt, { timeout, searchHint: false });
+}
+
+/**
+ * Run a full health check on the Gemini CLI installation.
+ * @returns {{ installed: boolean, version: string|null, loggedIn: boolean }}
+ */
+/**
+ * Run a full health check on the Gemini CLI installation.
+ * Uses a real headless probe to verify auth (not just file existence).
+ * @returns {{ installed: boolean, version: string|null, loggedIn: boolean }}
+ */
+export function healthCheck() {
+  const installed = isGeminiInstalled();
+  return {
+    installed,
+    version: installed ? getGeminiVersion() : null,
+    loggedIn: installed ? isGeminiAuthValid() : false,
+  };
+}
+
+
+
+================================================
+FILE: plugins/gemini/scripts/lib/render.mjs
+================================================
+/**
+ * Output rendering utilities for Gemini search/research results.
+ */
+
+/**
+ * Format a grounding report as Markdown.
+ * @param {object} report
+ * @param {string} report.query - Original query
+ * @param {string} report.output - Raw Gemini output
+ * @param {'search'|'research'|'audit'|'factcheck'|'changelog'|'compare'} report.mode
+ * @param {object} [report.stats]
+ * @returns {string}
+ */
+export function renderReport(report) {
+  const { query, output, mode, stats } = report;
+
+  const modeLabel = {
+    search: 'Grounded Search',
+    research: 'Deep Research',
+    audit: 'Security Audit',
+    factcheck: 'Fact Check',
+    changelog: 'Changelog',
+    compare: 'Comparison',
+  }[mode] || 'Search';
+
+  const lines = [
+    `## Gemini ${modeLabel} Results`,
+    '',
+    `**Query:** ${query}`,
+    '',
+    '---',
+    '',
+    output,
+    '',
+    '---',
+    `*Powered by Gemini CLI \u00b7 google_web_search*`,
+  ];
+
+  if (stats) {
+    lines.push(
+      '',
+      '<details>',
+      '<summary>Stats</summary>',
+      '',
+      '```json',
+      JSON.stringify(stats, null, 2),
+      '```',
+      '</details>',
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format an error message for display.
+ * @param {string} error
+ * @param {object} [context]
+ * @returns {string}
+ */
+export function renderError(error, context = {}) {
+  const lines = ['## Gemini Search Error', '', `**Error:** ${error}`];
+
+  if (context.exitCode) {
+    lines.push(`**Exit Code:** ${context.exitCode}`);
+  }
+  if (context.suggestion) {
+    lines.push('', `**Suggestion:** ${context.suggestion}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a health check result for display.
+ * @param {{ installed: boolean, version: string|null, loggedIn: boolean }} status
+ * @returns {string}
+ */
+export function renderHealthCheck(status) {
+  const lines = ['## Gemini CLI Status', ''];
+
+  if (!status.installed) {
+    lines.push(
+      '| Item | Status |',
+      '|------|--------|',
+      '| Installed | No |',
+      '',
+      'Gemini CLI is not installed. Install it:',
+      '```bash',
+      'npm install -g @google/gemini-cli',
+      '# or see https://github.com/google/gemini-cli',
+      '```',
+    );
+    return lines.join('\n');
+  }
+
+  lines.push(
+    '| Item | Status |',
+    '|------|--------|',
+    `| Installed | Yes |`,
+    `| Version | ${status.version || 'unknown'} |`,
+    `| Logged In | ${status.loggedIn ? 'Yes' : 'No'} |`,
+  );
+
+  if (!status.loggedIn) {
+    lines.push(
+      '',
+      'Run `gemini login` to authenticate.',
+    );
+  }
+
+  return lines.join('\n');
+}
+
+
+
+================================================
+FILE: plugins/gemini/scripts/lib/workspace.mjs
+================================================
+/**
+ * Workspace resolution utilities.
+ */
+
+import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+/**
+ * Resolve the workspace root directory.
+ * Prefers git root, falls back to cwd.
+ * @returns {string}
+ */
+export function resolveWorkspaceRoot() {
+  try {
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (gitRoot && existsSync(gitRoot)) return gitRoot;
+  } catch {
+    // not a git repo
+  }
+  return process.cwd();
+}
+
+/**
+ * Get a summary of the workspace context for enriching search queries.
+ * @returns {object}
+ */
+export function getWorkspaceContext() {
+  const root = resolveWorkspaceRoot();
+  const context = { root, ecosystems: [] };
+
+  const checks = [
+    { file: 'package.json', eco: 'JavaScript/TypeScript' },
+    { file: 'requirements.txt', eco: 'Python' },
+    { file: 'pyproject.toml', eco: 'Python' },
+    { file: 'Cargo.toml', eco: 'Rust' },
+    { file: 'go.mod', eco: 'Go' },
+    { file: 'pom.xml', eco: 'Java' },
+    { file: 'build.gradle', eco: 'Java' },
+    { file: 'Gemfile', eco: 'Ruby' },
+    { file: 'composer.json', eco: 'PHP' },
+    { file: 'pubspec.yaml', eco: 'Flutter/Dart' },
+  ];
+
+  for (const { file, eco } of checks) {
+    if (existsSync(resolve(root, file))) {
+      context.ecosystems.push(eco);
+    }
+  }
+
+  return context;
+}
+
+
+
+================================================
+FILE: plugins/gemini/skills/audit/SKILL.md
+================================================
+---
+description: Security & dependency audit using Gemini's grounded Google Search.
+argument-hint: '<package or technology>'
+disable-model-invocation: true
+allowed-tools: Bash AskUserQuestion Glob Read
+---
+Perform a security and dependency audit using Gemini CLI's grounded Google Search.
+
+Use this to check packages, libraries, or technologies for vulnerabilities,
+deprecations, and compatibility issues before adopting or upgrading them.
+
+Raw slash-command arguments:
+`$ARGUMENTS`
+
+## Steps
+
+1. If `$ARGUMENTS` is empty, use `AskUserQuestion` to ask what to audit.
+
+2. **Gather context** (optional but recommended):
+   - Use `Glob` and `Read` to check for `package.json`, `requirements.txt`, `Cargo.toml`,
+     `go.mod`, or similar dependency manifests in the workspace.
+   - If found, extract the relevant package version to enrich the audit query.
+
+3. Run the companion script:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" audit "$ARGUMENTS"
+   ```
+
+4. If the command fails:
+   - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup` to diagnose.
+   - Show the diagnosis to the user.
+
+5. Return the output **verbatim**.
+
+6. After the results, provide a **Audit Verdict**:
+   - **Risk Level:** Critical / High / Medium / Low / Clear
+   - **Action Required:** Yes / No
+   - **Summary:** One-sentence recommendation (proceed, update, replace, or avoid)
+
+## Constraints
+- Do not paraphrase the Gemini output.
+- Always err on the side of caution — if uncertain, recommend the user investigate further.
+- Do not auto-fix or auto-update any dependencies. Only advise.
+
+
+
+================================================
+FILE: plugins/gemini/skills/changelog/SKILL.md
+================================================
+---
+description: Get latest changelog, release notes, and breaking changes for a package.
+argument-hint: '<package[@version]>'
+disable-model-invocation: true
+allowed-tools: Bash AskUserQuestion Glob Read
+---
+Fetch the latest release notes, changelog, and breaking changes for a specific package
+or technology using Gemini's grounded Google Search.
+
+Use this before upgrading dependencies, adopting new versions, or investigating
+what changed between releases.
+
+Raw slash-command arguments:
+`$ARGUMENTS`
+
+## Steps
+
+1. If `$ARGUMENTS` is empty, use `AskUserQuestion` to ask which package to check.
+
+2. **Gather local context** (optional but recommended):
+   - Use `Glob` and `Read` to check dependency manifests (`package.json`, `requirements.txt`,
+     `Cargo.toml`, `go.mod`, etc.) for the current installed version of the package.
+   - If found, include the current version in the query for more targeted results.
+
+3. Run the companion script:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" changelog "$ARGUMENTS"
+   ```
+
+4. If the command fails:
+   - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup` to diagnose.
+   - Show the diagnosis to the user.
+
+5. Return the output **verbatim**.
+
+6. After the results, provide a **Changelog Summary**:
+   - **Latest Version:** version number and release date
+   - **Breaking Changes:** list any breaking changes (if upgrading)
+   - **Migration Required:** Yes / No — with brief description if yes
+   - **Recommendation:** Safe to upgrade / Review changes first / Wait for patch
+
+## Constraints
+- Do not paraphrase the Gemini output.
+- Be precise about version numbers — say "v4.2.1" not "a recent version."
+- If the search returns changelogs for a different version than requested, note the discrepancy.
+- Do not auto-update any dependencies. Only advise.
+- Prefer official sources (GitHub releases, npm, PyPI) over third-party summaries.
+
+
+
+================================================
+FILE: plugins/gemini/skills/compare/SKILL.md
+================================================
+---
+description: Compare two technologies with real-time benchmarks and community data.
+argument-hint: '<tech-a> vs <tech-b>'
+disable-model-invocation: true
+allowed-tools: Bash AskUserQuestion
+---
+Compare two technologies, frameworks, libraries, or tools using Gemini's real-time
+grounded Google Search to provide current benchmarks, community sentiment, and recommendations.
+
+Raw slash-command arguments:
+`$ARGUMENTS`
+
+## Steps
+
+1. If `$ARGUMENTS` is empty or does not contain two items to compare,
+   use `AskUserQuestion` to ask what technologies to compare.
+
+2. Run the companion script:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" compare "$ARGUMENTS"
+   ```
+
+3. If the command fails:
+   - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup` to diagnose.
+   - Suggest the user try `/gemini:search` for a broader lookup.
+
+4. Return the output **verbatim**.
+
+5. After the results, provide a **Comparison Verdict**:
+   - **Winner (for this use case):** Technology A / Technology B / Depends on context
+   - **Key Differentiator:** The single most important distinction
+   - **Recommendation:** One sentence tailored to the user's current project context
+
+## Constraints
+- Do not paraphrase the Gemini output.
+- Present both options fairly — do not show bias toward either technology.
+- Focus on current data (2025-2026), not historical reputation.
+- Include concrete metrics where available (bundle size, benchmark numbers, GitHub stars, npm downloads).
+- Acknowledge when the comparison is context-dependent and no universal winner exists.
+- Do not recommend based on personal preference — only on evidence from search results.
+
+
+
+================================================
+FILE: plugins/gemini/skills/fact-check/SKILL.md
+================================================
+---
+description: Fact-check a technical claim using Gemini's grounded Google Search.
+argument-hint: '<claim to verify>'
+disable-model-invocation: true
+allowed-tools: Bash AskUserQuestion
+---
+Verify a technical claim, assumption, or statement using Gemini's real-time grounded Google Search.
+
+Use this when you encounter claims in code comments, documentation, Stack Overflow answers,
+or conversation that need verification against current, authoritative sources.
+
+Raw slash-command arguments:
+`$ARGUMENTS`
+
+## Steps
+
+1. If `$ARGUMENTS` is empty, use `AskUserQuestion` to ask what claim to verify.
+
+2. Run the companion script:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" factcheck "$ARGUMENTS"
+   ```
+
+3. If the command fails with a non-zero exit code:
+   - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup` to diagnose.
+   - Show the diagnosis to the user and stop.
+
+4. Return the command output **verbatim** to the user.
+
+5. After the results, provide a **Fact-Check Verdict**:
+   - **Verdict:** Confirmed / Partially True / Misleading / False / Unverifiable
+   - **Confidence:** High / Medium / Low (based on source agreement)
+   - **Key Correction:** If the claim was wrong, state the correct information with source
+
+## Constraints
+- Do not paraphrase the Gemini output.
+- Do not speculate beyond what the search results show.
+- If sources disagree, present both sides and note the disagreement.
+- Always cite the sources that support or refute the claim.
+- If the claim cannot be verified through search, say so explicitly — do not guess.
+- Distinguish between "no evidence found" and "evidence contradicts the claim."
+
+
+
+================================================
+FILE: plugins/gemini/skills/gemini-prompting/SKILL.md
+================================================
+---
+description: Internal guidance for composing effective Gemini search queries.
+user-invocable: false
+---
+# Gemini Prompting Guide — Internal Skill
+
+This skill helps you compose effective queries when using Gemini's grounded
+Google Search via any of the Gemini skills (`search`, `research`, `audit`, `fact-check`, `changelog`, `compare`).
+
+## Query Composition Principles
+
+### Be Specific
+Bad: `"React updates"`
+Good: `"React 19 breaking changes migration from React 18 2026"`
+
+### Include Year Context
+Gemini's grounded search benefits from temporal markers.
+Bad: `"best Node.js framework"`
+Good: `"best Node.js framework 2026 comparison performance"`
+
+### Use Technical Precision
+Bad: `"Python package problem"`
+Good: `"requests library Python CVE vulnerability 2026"`
+
+### One Topic Per Query
+Bad: `"React 19 changes and Next.js 15 and TypeScript 6 updates"`
+Good: Run three separate searches, one per topic.
+
+## Query Templates
+
+### Version Check
+```
+"<package> latest stable version release date changelog"
+```
+
+### Security Audit
+```
+"<package> <version> CVE security vulnerability advisory 2026"
+```
+
+### Migration Guide
+```
+"<package> migration guide from <old_version> to <new_version> breaking changes"
+```
+
+### Comparison
+```
+"<tech_a> vs <tech_b> comparison benchmark performance 2026"
+```
+
+### Best Practices
+```
+"<technology> best practices production deployment 2026"
+```
+
+### Deprecation Check
+```
+"<technology> deprecated alternatives replacement 2026"
+```
+
+### Fact-Check
+```
+"<specific claim> site:github.com OR site:docs.* OR site:stackoverflow.com"
+```
+
+### Changelog
+```
+"<package> release notes changelog latest version breaking changes"
+```
+
+### Head-to-Head Comparison
+```
+"<tech_a> vs <tech_b> benchmark performance comparison 2025 2026"
+```
+
+## Skill Selection Guide
+
+| User Need | Best Skill | Why |
+|-----------|------------|-----|
+| "Is X true?" | `/gemini:fact-check` | Structured verdict with evidence |
+| "What changed in X?" | `/gemini:changelog` | Focused on release notes and migration |
+| "X vs Y?" | `/gemini:compare` | Structured comparison with metrics |
+| "Is X safe to use?" | `/gemini:audit` | CVE and deprecation focused |
+| General question | `/gemini:search` | Broad, fast grounded search |
+| Complex investigation | `/gemini:research` | Multi-step, cross-referenced (slow) |
+
+## Anti-Patterns
+
+- Do not include conversational filler: "Can you please search for..."
+- Do not ask Gemini to generate code — it's optimized for search, not codegen
+- Do not combine unrelated queries — run them separately
+- Do not repeat failed queries verbatim — rephrase with different keywords
+
+
+
+================================================
+FILE: plugins/gemini/skills/research/SKILL.md
+================================================
+---
+description: Deep multi-step research using Gemini's grounded Google Search.
+argument-hint: '<topic>'
+disable-model-invocation: true
+allowed-tools: Bash AskUserQuestion
+---
+Perform a deep, multi-step research investigation using Gemini CLI.
+
+This is the **deep research** mode — slower but more thorough than `/gemini:search`.
+Use this when you need comprehensive analysis with cross-referenced sources.
+
+Raw slash-command arguments:
+`$ARGUMENTS`
+
+## Steps
+
+1. If `$ARGUMENTS` is empty, use `AskUserQuestion` to ask what topic to research.
+
+2. Run the companion script with a 5-minute timeout:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" research "$ARGUMENTS"
+   ```
+
+3. If the command fails:
+   - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup` to diagnose.
+   - Suggest the user try `/gemini:search` for a faster but shallower lookup.
+
+4. Return the output **verbatim**.
+
+5. After the results, provide a **Research Summary**:
+   - **Key Findings:** Top 3 discoveries
+   - **Confidence Level:** High / Medium / Low (based on source agreement)
+   - **Recommended Next Steps:** What the user should do with this information
+
+## Constraints
+- Do not paraphrase the Gemini output.
+- Do not fabricate citations — only cite what the search returned.
+- This command has a longer timeout (5 min). Warn the user if it might take a moment.
+
+
+
+================================================
+FILE: plugins/gemini/skills/search/SKILL.md
+================================================
+---
+description: Perform a grounded Google Web Search using Gemini CLI.
+argument-hint: '<query>'
+disable-model-invocation: true
+allowed-tools: Bash AskUserQuestion
+---
+Perform a grounded Google Web Search using the Gemini CLI.
+
+Raw slash-command arguments:
+`$ARGUMENTS`
+
+## Steps
+
+1. If `$ARGUMENTS` is empty, use `AskUserQuestion` to ask the user what they want to search for.
+
+2. Run the companion script:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" search "$ARGUMENTS"
+   ```
+
+3. If the command fails with a non-zero exit code:
+   - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup` to diagnose.
+   - Show the diagnosis to the user and stop.
+
+4. Return the command output **verbatim** to the user.
+
+5. After providing results, briefly highlight at most 3 items:
+   - **Version Check:** Current version vs. latest found in search
+   - **Risk Alert:** Security or deprecation risks mentioned
+   - **Modern Alternatives:** If any newer approaches were found
+
+## Constraints
+- Do not paraphrase or add commentary before the results.
+- Do not wrap the output in additional markdown formatting — it is already formatted.
+- Treat the returned results as authoritative context for subsequent conversation.
+
+
+
+================================================
+FILE: plugins/gemini/skills/search-result-handling/SKILL.md
+================================================
+---
+description: Internal guidance for presenting Gemini search results to the user.
+user-invocable: false
+---
+# Search Result Handling — Internal Skill
+
+This skill provides guidance on how to handle and present Gemini search results
+within the Claude Code conversation.
+
+## Principles
+
+1. **Verbatim first.** Always present the raw Gemini output before any analysis.
+   The user should see exactly what Gemini returned.
+
+2. **Do not paraphrase search results.** If Gemini says "React 19.1.0 was released
+   on March 2026", do not rephrase it as "a recent version of React was released."
+
+3. **Cite what Gemini cited.** If the search output includes URLs or source names,
+   preserve them. Do not invent additional citations.
+
+4. **Additive analysis only.** After showing raw results, you may add:
+   - A brief summary of key points (3 bullets max)
+   - Relevance to the user's current task
+   - Suggested follow-up actions
+
+5. **Severity ordering.** When multiple findings exist, present them in order:
+   Critical > High > Medium > Low > Informational
+
+6. **Never auto-fix.** Search results may suggest updates or changes. Present
+   the recommendation but never automatically apply changes to the codebase.
+
+7. **Stale result awareness.** If search results seem outdated or contradictory,
+   flag this to the user and suggest re-running the search.
+
+## Mode-Specific Guidance
+
+- **search/research**: Highlight version numbers, dates, and source agreement
+- **audit**: Sort findings by severity (Critical > High > Medium > Low)
+- **factcheck**: Lead with the verdict (Confirmed / False / etc.) before evidence
+- **changelog**: Emphasize breaking changes and migration requirements
+- **compare**: Present both options fairly; recommend based on evidence, not preference
+
+## When Search Fails
+
+- Show the error clearly
+- Run `/gemini:setup` to diagnose
+- Suggest alternative approaches (different query, manual search)
+- Do not pretend the search succeeded
+
+
+
+================================================
+FILE: plugins/gemini/skills/setup/SKILL.md
+================================================
+---
+description: Check Gemini CLI installation and authentication status.
+argument-hint: ''
+disable-model-invocation: true
+allowed-tools: Bash AskUserQuestion
+---
+Check whether the Gemini CLI is installed and properly configured.
+
+## Steps
+
+1. Run the health check in JSON mode:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup --json
+   ```
+
+2. Parse the JSON output to determine status:
+   - `installed`: whether Gemini CLI binary exists on PATH
+   - `version`: the installed version string
+   - `loggedIn`: whether a minimal headless probe succeeds (verifies active auth, not just file existence)
+
+3. **If Gemini CLI is NOT installed:**
+   - Check if npm is available: `which npm`
+   - If npm is available, use `AskUserQuestion` to ask:
+     > Gemini CLI is not installed. Would you like to install it now?
+     > - Install via npm (Recommended)
+     > - Show manual installation instructions
+   - If user chooses install: run `npm install -g @google/gemini-cli`
+   - After install, re-run the health check to confirm.
+   - If npm is not available, show manual install instructions:
+     - Visit https://github.com/google/gemini-cli
+     - Or install Node.js first, then `npm install -g @google/gemini-cli`
+
+4. **If Gemini CLI is installed but NOT logged in:**
+   - Instruct the user to run `gemini login` in their terminal.
+   - Explain: authentication is required for Google Search to work.
+
+5. **If everything is healthy**, confirm all available skills:
+   - `/gemini:search` — Quick grounded Google Search
+   - `/gemini:research` — Deep multi-step research (5 min timeout)
+   - `/gemini:audit` — Security & dependency audit
+   - `/gemini:fact-check` — Verify technical claims
+   - `/gemini:changelog` — Latest release notes for a package
+   - `/gemini:compare` — Compare technologies with real-time data
+
+6. Run the human-readable health check for display:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup
+   ```
+
+
+
+================================================
+FILE: plugins/gemini/.claude-plugin/plugin.json
+================================================
+{
+  "name": "gemini",
+  "version": "1.0.0",
+  "description": "Real-time Google Search, fact-checking, changelog tracking & deep research for Claude Code — powered by Gemini CLI.",
+  "author": {
+    "name": "suhKingGyu"
+  },
+  "repository": "https://github.com/suhKingGyu/gemini-search-cc",
+  "license": "Apache-2.0",
+  "keywords": ["search", "google-search", "gemini", "fact-check", "audit", "research"]
+}
+
+
+
+================================================
+FILE: tests/companion.test.mjs
+================================================
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { join, dirname } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const companion = join(__dirname, '..', 'plugins', 'gemini', 'scripts', 'gemini-companion.mjs');
+
+function run(...args) {
+  return spawnSync('node', [companion, ...args], {
+    encoding: 'utf-8',
+    timeout: 5000,
+  });
+}
+
+describe('gemini-companion subcommand routing', () => {
+  it('prints usage on unknown subcommand', () => {
+    const result = run('unknown');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unknown subcommand/);
+  });
+
+  it('prints usage when no subcommand given', () => {
+    const result = run();
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unknown subcommand/);
+  });
+
+  it('lists all subcommands in usage', () => {
+    const result = run('unknown');
+    const usage = result.stderr;
+    assert.match(usage, /search/);
+    assert.match(usage, /research/);
+    assert.match(usage, /audit/);
+    assert.match(usage, /factcheck/);
+    assert.match(usage, /changelog/);
+    assert.match(usage, /compare/);
+    assert.match(usage, /setup/);
+  });
+
+  it('search requires a query', () => {
+    const result = run('search');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Usage:.*search/);
+  });
+
+  it('research requires a query', () => {
+    const result = run('research');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Usage:.*research/);
+  });
+
+  it('audit requires a query', () => {
+    const result = run('audit');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Usage:.*audit/);
+  });
+
+  it('factcheck requires a claim', () => {
+    const result = run('factcheck');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Usage:.*factcheck/);
+  });
+
+  it('changelog requires a package', () => {
+    const result = run('changelog');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Usage:.*changelog/);
+  });
+
+  it('compare requires a query', () => {
+    const result = run('compare');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Usage:.*compare/);
+  });
+});
+
+
+
+================================================
+FILE: tests/guard.test.mjs
+================================================
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { join, dirname } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const guardScript = join(__dirname, '..', 'plugins', 'gemini', 'hooks', 'guard-filter.mjs');
+
+function runGuard(command) {
+  const input = JSON.stringify({ tool_input: { command } });
+  const result = spawnSync('node', [guardScript], {
+    input,
+    encoding: 'utf-8',
+    timeout: 5000,
+  });
+  return JSON.parse(result.stdout.trim());
+}
+
+describe('guard-filter', () => {
+  describe('should trigger on package install commands', () => {
+    const triggers = [
+      ['npm install lodash', 'JavaScript/TypeScript'],
+      ['yarn add react', 'JavaScript/TypeScript'],
+      ['pnpm add express', 'JavaScript/TypeScript'],
+      ['pip install requests', 'Python'],
+      ['pip3 install flask', 'Python'],
+      ['poetry add django', 'Python'],
+      ['cargo add serde', 'Rust'],
+      ['go get github.com/gin-gonic/gin', 'Go'],
+      ['composer require laravel/framework', 'PHP'],
+      ['gem install rails', 'Ruby'],
+      ['brew install wget', 'System'],
+    ];
+
+    for (const [cmd, eco] of triggers) {
+      it(`triggers on: ${cmd}`, () => {
+        const out = runGuard(cmd);
+        assert.equal(out.type, 'prompt');
+        assert.match(out.prompt, new RegExp(`Gemini ${eco} Guard`));
+      });
+    }
+  });
+
+  describe('should NOT trigger on non-package commands', () => {
+    const passThrough = [
+      'docker build .',
+      'kubectl apply -f deploy.yaml',
+      'terraform init',
+      'aws s3 ls',
+      'gcloud compute instances list',
+      'git commit -m "test"',
+      'ls -la',
+      'node server.js',
+      'npx create-react-app my-app',
+    ];
+
+    for (const cmd of passThrough) {
+      it(`passes through: ${cmd}`, () => {
+        const out = runGuard(cmd);
+        assert.equal(out.type, undefined);
+      });
+    }
+  });
+
+  describe('edge cases', () => {
+    it('handles empty command', () => {
+      const out = runGuard('');
+      assert.equal(out.type, undefined);
+    });
+
+    it('handles command with only manager name', () => {
+      const out = runGuard('npm');
+      assert.equal(out.type, undefined);
+    });
+
+    it('npm run does not trigger', () => {
+      const out = runGuard('npm run build');
+      assert.equal(out.type, undefined);
+    });
+
+    it('npm test does not trigger', () => {
+      const out = runGuard('npm test');
+      assert.equal(out.type, undefined);
+    });
+  });
+});
+
+
+
+================================================
+FILE: tests/parse.test.mjs
+================================================
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { parseGeminiOutput } from '../plugins/gemini/scripts/lib/gemini.mjs';
+
+describe('parseGeminiOutput', () => {
+  it('parses valid JSON with response field', () => {
+    const input = JSON.stringify({ response: 'hello world' });
+    const result = parseGeminiOutput(input);
+    assert.equal(result.response, 'hello world');
+    assert.equal(result.error, null);
+    assert.equal(result.stats, null);
+  });
+
+  it('parses all three fields', () => {
+    const input = JSON.stringify({
+      response: 'answer',
+      error: null,
+      stats: { tokens: 100, latency: 5.2 },
+    });
+    const result = parseGeminiOutput(input);
+    assert.equal(result.response, 'answer');
+    assert.equal(result.error, null);
+    assert.deepEqual(result.stats, { tokens: 100, latency: 5.2 });
+  });
+
+  it('extracts string error', () => {
+    const input = JSON.stringify({ error: 'quota exceeded' });
+    const result = parseGeminiOutput(input);
+    assert.equal(result.response, null);
+    assert.equal(result.error, 'quota exceeded');
+  });
+
+  it('extracts object error with message', () => {
+    const input = JSON.stringify({ error: { message: 'rate limited', code: 429 } });
+    const result = parseGeminiOutput(input);
+    assert.equal(result.error, 'rate limited');
+  });
+
+  it('stringifies object error without message', () => {
+    const input = JSON.stringify({ error: { code: 500, detail: 'internal' } });
+    const result = parseGeminiOutput(input);
+    assert.equal(result.error, '{"code":500,"detail":"internal"}');
+  });
+
+  it('returns nulls for empty string', () => {
+    const result = parseGeminiOutput('');
+    assert.deepEqual(result, { response: null, error: null, stats: null });
+  });
+
+  it('returns nulls for null input', () => {
+    const result = parseGeminiOutput(null);
+    assert.deepEqual(result, { response: null, error: null, stats: null });
+  });
+
+  it('returns nulls for undefined input', () => {
+    const result = parseGeminiOutput(undefined);
+    assert.deepEqual(result, { response: null, error: null, stats: null });
+  });
+
+  it('returns nulls for whitespace-only input', () => {
+    const result = parseGeminiOutput('   \n  ');
+    assert.deepEqual(result, { response: null, error: null, stats: null });
+  });
+
+  it('returns nulls for invalid JSON', () => {
+    const result = parseGeminiOutput('not json at all');
+    assert.deepEqual(result, { response: null, error: null, stats: null });
+  });
+
+  it('returns null response for non-string response field', () => {
+    const input = JSON.stringify({ response: 123 });
+    const result = parseGeminiOutput(input);
+    assert.equal(result.response, null);
+  });
+
+  it('handles JSON with extra whitespace', () => {
+    const input = '  \n  ' + JSON.stringify({ response: 'trimmed' }) + '  \n';
+    const result = parseGeminiOutput(input);
+    assert.equal(result.response, 'trimmed');
+  });
+
+  it('preserves stats as-is', () => {
+    const stats = { models: [{ name: 'gemini-3' }], calls: 5 };
+    const input = JSON.stringify({ response: 'ok', stats });
+    const result = parseGeminiOutput(input);
+    assert.deepEqual(result.stats, stats);
+  });
+});
+
+
+
+================================================
+FILE: tests/render.test.mjs
+================================================
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { renderReport, renderError, renderHealthCheck } from '../plugins/gemini/scripts/lib/render.mjs';
+
+describe('renderReport', () => {
+  it('renders search mode with correct header', () => {
+    const out = renderReport({ query: 'test', output: 'result', mode: 'search' });
+    assert.match(out, /## Gemini Grounded Search Results/);
+    assert.match(out, /\*\*Query:\*\* test/);
+    assert.match(out, /result/);
+    assert.match(out, /Powered by Gemini CLI/);
+  });
+
+  it('renders all mode labels correctly', () => {
+    const modes = {
+      search: 'Grounded Search',
+      research: 'Deep Research',
+      audit: 'Security Audit',
+      factcheck: 'Fact Check',
+      changelog: 'Changelog',
+      compare: 'Comparison',
+    };
+    for (const [mode, label] of Object.entries(modes)) {
+      const out = renderReport({ query: 'q', output: 'o', mode });
+      assert.match(out, new RegExp(`Gemini ${label} Results`), `mode "${mode}" should produce label "${label}"`);
+    }
+  });
+
+  it('includes stats when provided', () => {
+    const out = renderReport({
+      query: 'q', output: 'o', mode: 'search',
+      stats: { tokens: 42 },
+    });
+    assert.match(out, /<details>/);
+    assert.match(out, /<summary>Stats<\/summary>/);
+    assert.match(out, /"tokens": 42/);
+  });
+
+  it('omits stats section when stats is null', () => {
+    const out = renderReport({ query: 'q', output: 'o', mode: 'search', stats: null });
+    assert.ok(!out.includes('<details>'));
+  });
+
+  it('omits stats section when stats is undefined', () => {
+    const out = renderReport({ query: 'q', output: 'o', mode: 'search' });
+    assert.ok(!out.includes('<details>'));
+  });
+});
+
+describe('renderError', () => {
+  it('renders error message', () => {
+    const out = renderError('something broke');
+    assert.match(out, /## Gemini Search Error/);
+    assert.match(out, /\*\*Error:\*\* something broke/);
+  });
+
+  it('includes exit code when provided', () => {
+    const out = renderError('fail', { exitCode: 42 });
+    assert.match(out, /\*\*Exit Code:\*\* 42/);
+  });
+
+  it('includes suggestion when provided', () => {
+    const out = renderError('fail', { suggestion: 'try again' });
+    assert.match(out, /\*\*Suggestion:\*\* try again/);
+  });
+
+  it('omits exit code when not provided', () => {
+    const out = renderError('fail', {});
+    assert.ok(!out.includes('Exit Code'));
+  });
+});
+
+describe('renderHealthCheck', () => {
+  it('renders not-installed state', () => {
+    const out = renderHealthCheck({ installed: false, version: null, loggedIn: false });
+    assert.match(out, /Installed \| No/);
+    assert.match(out, /npm install -g @google\/gemini-cli/);
+  });
+
+  it('renders installed and logged-in state', () => {
+    const out = renderHealthCheck({ installed: true, version: '0.36.0', loggedIn: true });
+    assert.match(out, /Installed \| Yes/);
+    assert.match(out, /Version \| 0\.36\.0/);
+    assert.match(out, /Logged In \| Yes/);
+  });
+
+  it('renders installed but not logged-in state', () => {
+    const out = renderHealthCheck({ installed: true, version: '1.0.0', loggedIn: false });
+    assert.match(out, /Logged In \| No/);
+    assert.match(out, /gemini login/);
+  });
+
+  it('handles unknown version', () => {
+    const out = renderHealthCheck({ installed: true, version: null, loggedIn: true });
+    assert.match(out, /Version \| unknown/);
+  });
+});
+
+
+
+================================================
+FILE: .claude-plugin/marketplace.json
+================================================
+{
+  "name": "gemini-search",
+  "owner": {
+    "name": "suhKingGyu"
+  },
+  "metadata": {
+    "description": "Real-time Google Search & deep research plugins for Claude Code, powered by Gemini CLI.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "gemini",
+      "description": "Real-time Google Search, fact-checking, changelog tracking & deep research for Claude Code — powered by Gemini CLI.",
+      "version": "1.0.0",
+      "author": {
+        "name": "suhKingGyu"
+      },
+      "source": "./plugins/gemini"
+    }
+  ]
+}
+
+
+
+================================================
+FILE: .github/PULL_REQUEST_TEMPLATE.md
+================================================
+## Description
+<!-- Please include a summary of the change and which issue is fixed. -->
+
+Fixes # (issue)
+
+## Type of change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+
+## Checklist:
+- [ ] My code follows the style guidelines of this project
+- [ ] I have performed a self-review of my own code
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have made corresponding changes to the documentation
+- [ ] My changes generate no new warnings
+- [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] New and existing unit tests pass locally with my changes
+
+
+
+================================================
+FILE: .github/ISSUE_TEMPLATE/bug_report.yml
+================================================
+name: Bug report
+description: Create a report to help us improve
+title: "[BUG] "
+labels: bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: To Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Run command '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node.js version, Gemini CLI version.
+    validations:
+      required: true
+
+
+
+================================================
+FILE: .github/ISSUE_TEMPLATE/feature_request.yml
+================================================
+name: Feature request
+description: Suggest an idea for this project
+title: "[FEATURE] "
+labels: enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a feature!
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem? Please describe.
+      description: A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe the solution you'd like
+      description: A clear and concise description of what you want to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Describe alternatives you've considered
+      description: A clear and concise description of any alternative solutions or features you've considered.
+
+
+
+================================================
+FILE: .github/workflows/ci.yml
+================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm test
+
+

@@ -1,0 +1,23 @@
+filters:
+  and:
+    - file.folder == "wiki-pages/index"
+views:
+  - type: table
+    name: 表格
+    order:
+      - file.name
+      - author
+      - clip_type
+      - url
+      - file.folder
+    sort:
+      - property: file.folder
+        direction: ASC
+      - property: author
+        direction: DESC
+      - property: 收藏類型
+        direction: ASC
+    columnSize:
+      file.name: 263
+      note.author: 107
+      note.url: 546
