@@ -18,6 +18,7 @@ This project organizes raw saved material into durable, cross-linked wiki pages.
 ```text
 knowledge-wiki/
 ├── AGENTS.md
+├── AGENTS_en.md
 ├── raw/                             # User-managed source material, treated as read-only
 │   ├── README.md
 │   └── examples/                    # Synthetic publishable source examples
@@ -78,19 +79,19 @@ python tools\wiki_maintain.py handoff --task "batch-name" --next "next-step"
 
 ### Public agent instructions sync
 
-The public branch keeps `AGENTS.md` as the sanitized version of the private working-vault `CLAUDE.md`. After changing `CLAUDE.md` on the private branch, regenerate the public instructions from the public branch:
+The public branch keeps `AGENTS.md` as the sanitized version of the private working-vault `CLAUDE.md`, with `AGENTS_en.md` as the English companion. After changing `CLAUDE.md` on the private branch, regenerate both public instruction files from the public branch:
 
 ```powershell
 python tools\sync_public_agents.py --source-ref master
 ```
 
-To check whether `AGENTS.md` is out of sync without writing:
+To check whether either `AGENTS.md` or `AGENTS_en.md` is out of sync without writing:
 
 ```powershell
 python tools\sync_public_agents.py --source-ref master --check
 ```
 
-The sync script removes private category/project-only rules and keeps paths relative for public display.
+The sync script removes private category/project-only rules and keeps paths relative for public display. If `AGENTS.md` changes, `AGENTS_en.md` must be updated in the same commit.
 
 ### Subcommand reference
 

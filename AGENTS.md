@@ -4,11 +4,15 @@ This file is generated from the private `CLAUDE.md` workflow rules and then
 sanitized for the public showcase branch. Private category exceptions, local
 absolute paths, editor state, and project-only rules are intentionally omitted.
 
+English companion: `AGENTS_en.md`. When this file changes, update the English
+version in the same commit by running `python tools\sync_public_agents.py`.
+
 ## Repository Structure
 
 ```text
 knowledge-wiki/
 ├── AGENTS.md
+├── AGENTS_en.md
 ├── README.md
 ├── raw/
 │   ├── README.md
