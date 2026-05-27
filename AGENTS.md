@@ -185,14 +185,15 @@ status: stub  # Level 1（純觀點）；若為 Level 2（含指令/步驟/範�
 
 #### frontmatter 作者欄格式規則
 
-- `作者:` 欄位必須保持為合法 YAML。
-- 單一作者若使用陣列格式，必須加雙引號：
+- `作者:` 欄位必須保持為合法 YAML list。
+- 單一作者必須使用雙引號陣列格式：
   - 正確：`作者: ["@account"]`
-  - 正確：`作者: ["account"]`
   - 正確：`作者: []`
   - 錯誤：`作者: [@account]`
   - 錯誤：`作者: [account]`
-- 若作者是從 Threads URL 自動補值，預設補成單一字串陣列並加雙引號。
+- 錯誤：`作者: account`
+- 錯誤：`作者: @account`
+- 若作者是從 Threads URL 自動補值，預設補成 `作者: ["@account"]`。
 - 修改 frontmatter 後，必須確認整份 frontmatter 仍可被 YAML parser 正常解析。
 
 #### threads-saved 作者補值規則

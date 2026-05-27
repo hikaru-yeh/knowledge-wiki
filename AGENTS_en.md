@@ -150,15 +150,16 @@ status: stub
 
 ### Author Field
 
-- The `作者:` field must remain valid YAML.
+- The `作者:` field must remain a valid YAML list field.
 - Treat it as a list field.
 - Correct:
   - `作者: ["@account"]`
-  - `作者: ["account"]`
   - `作者: []`
 - Incorrect:
   - `作者: [@account]`
   - `作者: [account]`
+  - `作者: account`
+  - `作者: @account`
 - If an author can be inferred from a Threads URL, write it as a quoted
   single-item list: `作者: ["@account"]`.
 - After editing frontmatter, ensure the frontmatter can still be parsed as YAML.
