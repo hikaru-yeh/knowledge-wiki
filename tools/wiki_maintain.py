@@ -1287,6 +1287,17 @@ def render_review_reconcile_report(
 
 THREADS_RAW_SUBDIRS = ["threads", "threads-saved", "threads-iphone"]
 
+# Non-content files that live inside raw/threads* but are not thread posts.
+# Matched case-insensitively against the file stem (filename without .md).
+RAW_EXCLUDED_STEMS: set[str] = {
+    "handoff",
+    "memory",
+    "readme",
+    "_template",
+    "_index",
+    "_project_template",
+}
+
 CATEGORY_HINTS: list[tuple[list[str], str]] = [
     (["Claude", "Codex", "Agent", "AI", "LLM", "MCP", "NotebookLM", "Gemini", "OpenAI", "GPT", "Copilot"], "AI 工具"),
     (["履歷", "面試", "求職", "LinkedIn", "HR", "職涯"], "求職履歷"),
@@ -1338,6 +1349,8 @@ def load_threads_raw_records(root: Path, raw_dir: Path) -> list[RawRecord]:
             continue
         for path in sorted(subdir.rglob("*.md")):
             if any(part.startswith(".") for part in path.relative_to(subdir).parts):
+                continue
+            if path.stem.lower() in RAW_EXCLUDED_STEMS:
                 continue
             text = read_text(path)
             frontmatter, body = parse_frontmatter(text)
@@ -2069,6 +2082,240 @@ def command_canonical_guard(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# scan aggregator
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ScanSectionSummary:
+    name: str
+    errors: int
+    warnings: int
+    info: int
+
+
+@dataclass(frozen=True)
+class ScanResult:
+    status_audit: StatusAudit
+    canonical_guard: CanonicalGuardResult
+    index_lint: IndexLint
+    coverage: CoverageResult
+    duplicates: DuplicatesResult
+    blocked: list[BlockedRecord]
+
+
+def _section_summary(name: str, errors: int = 0, warnings: int = 0, info: int = 0) -> ScanSectionSummary:
+    return ScanSectionSummary(name=name, errors=errors, warnings=warnings, info=info)
+
+
+def collect_scan(root: Path, wiki_dir: Path, raw_dir: Path) -> ScanResult:
+    return ScanResult(
+        status_audit=collect_status_audit(root, wiki_dir),
+        canonical_guard=collect_canonical_guard(root, wiki_dir),
+        index_lint=collect_index_lint(root, wiki_dir, raw_dir),
+        coverage=collect_coverage(root, wiki_dir, raw_dir),
+        duplicates=collect_duplicates(root, wiki_dir),
+        blocked=collect_blocked_records(root, wiki_dir, raw_dir),
+    )
+
+
+def _scan_section_summaries(result: ScanResult) -> list[ScanSectionSummary]:
+    sa = result.status_audit
+    cg = result.canonical_guard
+    il = result.index_lint
+    cv = result.coverage
+    dp = result.duplicates
+    bl = result.blocked
+
+    status_errors = len(sa.missing) + len(sa.unknown) + len(sa.misplaced_project_management)
+    author_errors = len(sa.author_issues)
+
+    lint_errors = sum(1 for i in il.issues if i.code in ("literal-raw-link", "missing-target"))
+    lint_warnings = sum(1 for i in il.issues if i.code in ("ambiguous-bare-link", "stub-marker-mismatch"))
+
+    blocked_nonlingorm = sum(1 for b in bl if b.policy_bucket == "blocked-nonlingorm")
+    blocked_lingorm = sum(1 for b in bl if b.policy_bucket == "excluded-lingorm")
+
+    return [
+        _section_summary("status-audit", errors=status_errors),
+        _section_summary("author-validation", errors=author_errors),
+        _section_summary("canonical-guard", errors=len(cg.stale_conflicts)),
+        _section_summary("index-lint", errors=lint_errors, warnings=lint_warnings),
+        _section_summary("coverage", info=len(cv.raw_only), warnings=len(cv.raw_missing_url)),
+        _section_summary("duplicates", errors=sum(len(g.pages) for g in dp.groups)),
+        _section_summary("blocked-nonlingorm", warnings=blocked_nonlingorm),
+        _section_summary("blocked-lingorm", info=blocked_lingorm),
+    ]
+
+
+def render_scan_report(result: ScanResult, report_date: str) -> str:
+    sections = _scan_section_summaries(result)
+    total_e = sum(s.errors for s in sections)
+    total_w = sum(s.warnings for s in sections)
+    total_i = sum(s.info for s in sections)
+
+    lines = [
+        f"# Wiki Maintenance Report - {report_date}",
+        "",
+        "## Summary",
+        "",
+        "| Check | Errors | Warnings | Info |",
+        "|---|---:|---:|---:|",
+    ]
+    for s in sections:
+        lines.append(f"| {s.name} | {s.errors} | {s.warnings} | {s.info} |")
+    lines.append(f"| **Total** | **{total_e}** | **{total_w}** | **{total_i}** |")
+    lines.append("")
+
+    sa = result.status_audit
+    lines.extend([
+        "## Status Audit",
+        "",
+        f"- Content pages: {sa.content_pages}",
+        f"- wiki: {sa.main_counts.get('wiki', 0)}, reference: {sa.main_counts.get('reference', 0)}, stub: {sa.main_counts.get('stub', 0)}",
+        "",
+    ])
+    if sa.missing:
+        lines.append("### Missing Status")
+        lines.append("")
+        for issue in sa.missing:
+            lines.append(f"- `{issue.path}`")
+        lines.append("")
+    if sa.author_issues:
+        lines.append(f"### Author Validation Issues ({len(sa.author_issues)})")
+        lines.append("")
+        for issue in sa.author_issues[:20]:
+            lines.append(f"- `{issue.path}` [{issue.rule}]: {issue.message}")
+        if len(sa.author_issues) > 20:
+            lines.append(f"- ... and {len(sa.author_issues) - 20} more")
+        lines.append("")
+
+    cg = result.canonical_guard
+    if cg.stale_conflicts:
+        lines.extend(["## Canonical Guard", ""])
+        for conflict in cg.stale_conflicts:
+            lines.append(f"- ERROR stale: `{conflict.stale}` (canonical: `{conflict.canonical}`)")
+        lines.append("")
+
+    il = result.index_lint
+    if il.issues:
+        lines.extend(["## Index Lint", ""])
+        by_code: dict[str, list[IndexIssue]] = {}
+        for issue in il.issues:
+            by_code.setdefault(issue.code, []).append(issue)
+        for code, issues in sorted(by_code.items()):
+            lines.append(f"### {code} ({len(issues)})")
+            lines.append("")
+            for issue in issues[:15]:
+                lines.append(f"- `{issue.path}`:{issue.line} → {issue.target}: {issue.detail}")
+            if len(issues) > 15:
+                lines.append(f"- ... and {len(issues) - 15} more")
+            lines.append("")
+
+    cv = result.coverage
+    lines.extend([
+        "## Coverage",
+        "",
+        f"- Raw scanned: {cv.total_raw}, with URL: {cv.raw_with_url}",
+        f"- Raw-only (not in wiki): {len(cv.raw_only)}",
+        f"- Missing URL: {len(cv.raw_missing_url)}",
+        f"- Wiki coverage: {cv.wiki_coverage}",
+        "",
+    ])
+    if cv.raw_only:
+        lines.extend(["| Raw File | Suggested Category |", "|---|---|"])
+        for entry in cv.raw_only:
+            lines.append(f"| `{entry.raw_record.rel_path}` | {entry.suggested_category} |")
+        lines.append("")
+    if cv.raw_missing_url:
+        lines.extend(["### Missing URL", ""])
+        for record in cv.raw_missing_url:
+            lines.append(f"- `{record.rel_path}`")
+        lines.append("")
+
+    dp = result.duplicates
+    if dp.groups:
+        lines.extend(["## Duplicates", ""])
+        for group in dp.groups:
+            lines.append(f"### {group.url}")
+            lines.append(f"Suggested canonical: `{group.suggested_canonical}`")
+            lines.append("")
+            for entry in group.pages:
+                hub = " (hub)" if entry.is_hub else ""
+                lines.append(f"- `{entry.page.rel_path}` [status: {entry.page.status}]{hub}")
+            lines.append("")
+
+    bl = result.blocked
+    nonlingorm = [b for b in bl if b.policy_bucket == "blocked-nonlingorm"]
+    lingorm = [b for b in bl if b.policy_bucket == "excluded-lingorm"]
+    if nonlingorm:
+        lines.extend([f"## Blocked Non-LingOrm ({len(nonlingorm)})", ""])
+        for b in nonlingorm:
+            lines.append(f"- `{b.path}` [{b.reason}]")
+        lines.append("")
+    if lingorm:
+        lines.extend([f"## Blocked LingOrm Excluded ({len(lingorm)})", ""])
+        lines.append(f"{len(lingorm)} LingOrm stubs excluded by policy.")
+        lines.append("")
+
+    lines.extend([
+        "## Suggested Next Agent Prompt",
+        "",
+        "```text",
+        f"請依照 tasks/maintenance-reports/maintenance-report-{report_date}.md，只處理 Errors。",
+        "LingOrm stub 保留。",
+        "先提出修復計畫，不要直接大批刪檔。",
+        "```",
+    ])
+
+    return "\n".join(lines)
+
+
+def unique_scan_report_path(report_dir: Path, report_date: str) -> Path:
+    first_path = report_dir / f"maintenance-report-{report_date}.md"
+    if not first_path.exists():
+        return first_path
+    for index in range(2, 1000):
+        path = report_dir / f"maintenance-report-{report_date}-{index}.md"
+        if not path.exists():
+            return path
+    raise RuntimeError(f"too many scan reports already exist for {report_date}")
+
+
+def command_scan(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    wiki_dir = Path(args.wiki_dir)
+    raw_dir = Path(args.raw_dir)
+
+    print("scan: running all report-only checks...")
+    result = collect_scan(root, wiki_dir, raw_dir)
+    sections = _scan_section_summaries(result)
+
+    total_e = sum(s.errors for s in sections)
+    total_w = sum(s.warnings for s in sections)
+    total_i = sum(s.info for s in sections)
+
+    for s in sections:
+        if s.errors or s.warnings or s.info:
+            print(f"  {s.name}: errors={s.errors} warnings={s.warnings} info={s.info}")
+
+    print(f"totals: errors={total_e} warnings={total_w} info={total_i}")
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
+            report_path = unique_scan_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+        except (RuntimeError, ValueError) as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
+        write_text(report_path, render_scan_report(result, report_date))
+        print(f"wrote {normalize_rel_path(report_path, root)}")
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Repo-specific report-only wiki maintenance helpers.",
@@ -2079,6 +2326,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tasks-dir", default=TASKS_DIR_DEFAULT, help="Tasks/report directory relative to root.")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    scan = subparsers.add_parser("scan", help="Run all report-only checks and produce a combined maintenance report.")
+    scan.add_argument("--report", action="store_true", help="Write a dated maintenance report Markdown file.")
+    scan.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    scan.set_defaults(func=command_scan)
 
     handoff = subparsers.add_parser("handoff", help="Write tasks/current-handoff.md for session recovery.")
     handoff.add_argument("--task", required=True, help="Current task or batch name.")
