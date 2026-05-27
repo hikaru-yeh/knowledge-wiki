@@ -60,3 +60,4 @@ tasks/fix_*.py
 tools/*
 !tools/
 !tools/wiki_maintain.py
+!tools/sync_public_agents.py

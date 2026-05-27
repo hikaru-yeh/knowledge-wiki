@@ -24,6 +24,8 @@ knowledge-wiki/
 ├── tasks/
 │   └── maintenance-reports/         # Placeholder for generated local reports
 ├── tools/                           # Repo-specific maintenance scripts
+│   ├── sync_public_agents.py        # Regenerate public AGENTS.md from private CLAUDE.md
+│   └── wiki_maintain.py
 └── wiki-pages/                      # LLM-maintained structured knowledge pages
     ├── README.md
     ├── index/                       # Example index structure
@@ -74,6 +76,22 @@ python tools\wiki_maintain.py blocked-report
 python tools\wiki_maintain.py handoff --task "batch-name" --next "next-step"
 ```
 
+### Public agent instructions sync
+
+The public branch keeps `AGENTS.md` as the sanitized version of the private working-vault `CLAUDE.md`. After changing `CLAUDE.md` on the private branch, regenerate the public instructions from the public branch:
+
+```powershell
+python tools\sync_public_agents.py --source-ref master
+```
+
+To check whether `AGENTS.md` is out of sync without writing:
+
+```powershell
+python tools\sync_public_agents.py --source-ref master --check
+```
+
+The sync script removes private category/project-only rules and keeps paths relative for public display.
+
 ### Subcommand reference
 
 | Subcommand | Main purpose | Writes report/file | Output path | Changes `wiki-pages/` |
@@ -121,10 +139,7 @@ status: stub | wiki | reference
 - `wiki`: A synthesized, structured knowledge page.
 - `reference`: A high-preservation page for technical documentation, GitHub repositories, APIs, or detailed how-to material.
 
-Special cases:
-
-- `LingOrm` stubs are intentionally preserved and excluded from ordinary promote workflows.
-- `專案管理/` may also contain `active` and `legacy` documents, which are audited separately from the main wiki/reference/stub dashboard.
+Private working vaults may define category-specific exceptions or additional statuses. Those private exceptions are intentionally omitted from the public scaffold.
 
 ## Preservation Levels
 
@@ -162,7 +177,7 @@ This repository is intentionally separate from [`hikaru-yeh/personal-wiki`](http
 | Content type | External knowledge collection: saved posts, tool notes, AI workflows, tutorials, and reusable methods | Personal facts and history: identity, relationships, career records, interviews, courses, and life events |
 | Sensitivity | Lower; mostly public or shareable sources | Higher; may include PII, relationships, career context, salary notes, and private records |
 | Maintenance rhythm | Continuous ingestion whenever useful external material appears | Event-driven updates around interviews, jobs, courses, milestones, and personal changes |
-| Privacy rules | Lightweight; focused on keeping the public scaffold free of private source material | Explicit privacy and sanitization rules, including `privacy_sanitize_rules.md` |
+| Privacy rules | Lightweight; focused on keeping the public scaffold free of private source material | Explicit privacy and sanitization rules for personal facts and records |
 | Main audience | The owner and potentially shareable readers | The owner only in the private version |
 | Agent-rule complexity | Medium; optimized for ingesting, indexing, querying, and maintenance reporting | Higher; includes privacy, lifecycle metadata, correction flows, and people/entity disambiguation |
 
