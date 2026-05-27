@@ -1,0 +1,62 @@
+# Local agent/editor state
+.claude/
+.obsidian/
+.gbrain-source
+BASE-VIEW.base
+CLAUDE*.md
+gemini-scribe/
+lint.md
+専案管理-rules.md
+template/
+
+# Python/runtime cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Private source inbox.
+# Public scaffold keeps only README/example placeholders.
+raw/**
+!raw/
+!raw/README.md
+!raw/examples/
+!raw/examples/**
+!raw/.gitkeep
+
+# Private curated wiki contents.
+# Public scaffold keeps only README/example placeholders and selected indexes/examples.
+wiki-pages/.git/
+wiki-pages/**/*.md
+!wiki-pages/README.md
+!wiki-pages/log.example.md
+!wiki-pages/example-topic/
+!wiki-pages/example-topic/**
+!wiki-pages/index/
+!wiki-pages/index/example-index.md
+!wiki-pages/index/.gitkeep
+!wiki-pages/.gitkeep
+
+# Operational maintenance output from the private working vault
+tasks/**
+!tasks/
+!tasks/maintenance-reports/
+!tasks/maintenance-reports/.gitkeep
+tasks/current-handoff.md
+tasks/blocked-content-gaps.md
+tasks/maintenance-reports/*
+!tasks/maintenance-reports/.gitkeep
+tasks/*inventory*.md
+tasks/task*-precheck.md
+tasks/content-quality-audit.md
+tasks/todo.md
+tasks/plan.md
+tasks/*.ps1
+tasks/*_check.py
+tasks/scan_*.py
+tasks/verify_*.py
+tasks/fix_*.py
+
+# Tooling: publish the report-first maintenance CLI; keep private helper scripts out.
+tools/*
+!tools/
+!tools/wiki_maintain.py
