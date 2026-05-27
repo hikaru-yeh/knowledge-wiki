@@ -1,5 +1,7 @@
 # Knowledge Wiki
 
+Languages: [English](README.md) | [繁體中文](README.zh-TW.md)
+
 A scaffold of an LLM-maintained knowledge wiki.
 
 This project organizes raw saved material into durable, cross-linked wiki pages. The original vault is used as a private second brain for notes, references, project memory, AI tooling research, job-search material, health notes, travel/food notes, and fandom/media notes. This public-friendly version keeps the architecture and workflow while omitting the private note contents.
