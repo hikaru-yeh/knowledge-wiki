@@ -11,7 +11,7 @@ Languages: [English](README.md) | [繁體中文](README.zh-TW.md)
 - 一套實用的 AI 輔助個人知識庫資訊架構。
 - 原始來源資料與整理後 wiki 頁面的清楚分離。
 - 將雜亂保存的貼文、參考資料、專案筆記與匯入文件轉成結構化 Markdown 知識的工作流程。
-- 索引維護規則、頁面狀態慣例，以及專案管理知識模式。
+- 索引維護規則、頁面狀態慣例，以及工作流程知識模式。
 - 可重複用於 Obsidian、Claude Code、Codex 或其他 LLM 輔助寫作流程的 repository 結構。
 - 輕量的維護工具層。它可在任何 apply 工作流程執行前，回報 wiki 健康狀態、受阻頁面、重複 URL 與匯入覆蓋率。
 
@@ -66,6 +66,37 @@ python tools\wiki_maintain.py <subcommand> [options]
 - 目前工具主要只用於報告。
 - 用報告來決定下一批有邊界的清理工作。
 - 不要盲目從工具執行 apply 類型的維護操作。
+
+### 維護架構狀態
+
+這套維護架構的靈感來源包含：
+
+- [`kfchou/wiki-skills`](https://github.com/kfchou/wiki-skills)
+- [`lewislulu/llm-wiki-skill`](https://github.com/lewislulu/llm-wiki-skill)
+
+目前實作仍在進行中。這個公開腳手架展示的是 **report-first 維護層**，不是完整自動化的 wiki 改寫器。
+
+已完成：
+
+- 公開／私人 agent 指令同步：`AGENTS.md` 與 `AGENTS_en.md`
+- session handoff 報告產生
+- blocked content gap 報告
+- status / frontmatter 稽核
+- index lint
+- review finding reconciliation
+- raw-to-wiki coverage 報告
+- duplicate URL 偵測
+- canonical guard：偵測過期檔案與作者 frontmatter 規則違反
+
+尚未完成：
+
+- 一鍵 `scan` aggregator
+- pending raw-to-wiki matching 與 digest injection
+- promote / ingest / index repair 的安全 apply 流程
+- canonical cleanup automation
+- audit-list generation
+- 多 agent 維護批次的 delegate integration
+- 發布前檢查 report cleanliness 的 CI gates
 
 ### 常用指令
 

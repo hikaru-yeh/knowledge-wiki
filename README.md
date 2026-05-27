@@ -11,7 +11,7 @@ This project organizes raw saved material into durable, cross-linked wiki pages.
 - A practical information architecture for an AI-assisted personal knowledge base.
 - A clean separation between raw source material and curated wiki pages.
 - A workflow for turning messy saved posts, references, project notes, and imported documents into structured Markdown knowledge.
-- Index maintenance rules, page status conventions, and project-management knowledge patterns.
+- Index maintenance rules, page status conventions, and workflow knowledge patterns.
 - A repository shape that can be reused for Obsidian, Claude Code, Codex, or other LLM-assisted writing workflows.
 - A lightweight maintenance tool layer for reporting wiki health, blocked pages, duplicate URLs, and ingest coverage before any apply workflow is allowed.
 
@@ -66,6 +66,39 @@ Current rule of thumb:
 - Current tooling is primarily report-only.
 - Use reports to decide the next bounded cleanup batch.
 - Do not run apply-style maintenance blindly from tooling.
+
+### Maintenance architecture status
+
+The maintenance architecture is inspired by:
+
+- [`kfchou/wiki-skills`](https://github.com/kfchou/wiki-skills)
+- [`lewislulu/llm-wiki-skill`](https://github.com/lewislulu/llm-wiki-skill)
+
+The implementation is still a work in progress. The current public scaffold
+shows the **report-first maintenance layer**, not a fully automated wiki
+rewriter.
+
+Implemented:
+
+- public/private agent instruction sync: `AGENTS.md` and `AGENTS_en.md`
+- session handoff report generation
+- blocked content gap reporting
+- status/frontmatter auditing
+- index linting
+- review finding reconciliation
+- raw-to-wiki coverage reporting
+- duplicate URL detection
+- canonical guard checks for stale files and author frontmatter rules
+
+Not implemented yet:
+
+- one-command `scan` aggregator
+- pending raw-to-wiki matching and digest injection
+- safe apply flows for promote / ingest / index repair
+- canonical cleanup automation
+- audit-list generation
+- delegate integration for multi-agent maintenance batches
+- CI gates that enforce report cleanliness before publishing
 
 ### Common commands
 
