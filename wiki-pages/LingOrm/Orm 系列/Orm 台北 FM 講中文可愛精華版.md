@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@smallnook/post/DUUogeSE7Gk
-作者: smallnook
+作者: ["@smallnook"]
 status: wiki
 ---
 

@@ -228,7 +228,7 @@ def dismiss_overlays(page: Page) -> None:
 
 
 def fetch_author_content(url: str, target_handle: str) -> AuthorContentResult:
-    normalized_handle = target_handle.strip().lstrip("@")
+    normalized_handle = extract_handle(target_handle)
     if not normalized_handle:
         raise RuntimeError("缺少作者 handle，無法從頁面抽取作者主文與留言")
 
@@ -279,6 +279,25 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
     return metadata, body
 
 
+def normalize_author_field(raw: str) -> str:
+    """Any author format → canonical YAML list: [] or ["@handle"]."""
+    v = raw.strip()
+    if not v or v in ("[]", "[ ]"):
+        return "[]"
+    if v.startswith("[") and v.endswith("]"):
+        return v
+    handle = v.lstrip("@")
+    return f'["@{handle}"]'
+
+
+def extract_handle(author_field: str) -> str:
+    """Any author format → bare handle string (no @, no brackets)."""
+    v = author_field.strip()
+    if v.startswith("[") and v.endswith("]"):
+        v = v[1:-1].strip().strip('"').strip("'")
+    return v.lstrip("@")
+
+
 def render_frontmatter(metadata: dict[str, str]) -> list[str]:
     lines = ["---"]
     for key, value in metadata.items():
@@ -312,7 +331,7 @@ def build_page_content(
     author_comments: list[str],
 ) -> str:
     url = metadata["網址"]
-    author = metadata["作者"]
+    author = extract_handle(metadata["作者"])
     lines: list[str] = [
         *render_frontmatter(metadata),
         "",
@@ -350,9 +369,11 @@ def update_page(path: Path, api_key: str) -> dict[str, Any]:
     metadata, _body = parse_frontmatter(original_text)
     url = metadata.get("網址", "").strip()
     author = metadata.get("作者", "").strip()
+    metadata["作者"] = normalize_author_field(author)
+    author_handle = extract_handle(author)
     if not url:
         raise RuntimeError(f"{path} 缺少網址")
-    if not author or author == "[]":
+    if not author_handle:
         raise RuntimeError(f"{path} 缺少作者")
 
     social: SocialCrawlResult | None = None
@@ -364,7 +385,7 @@ def update_page(path: Path, api_key: str) -> dict[str, Any]:
     extraction_mode = "playwright_only"
     extracted: AuthorContentResult | None = None
     try:
-        extracted = fetch_author_content(url, author)
+        extracted = fetch_author_content(url, author_handle)
         extraction_mode = "playwright+socialcrawl" if social else "playwright_only"
     except Exception:
         extracted = None

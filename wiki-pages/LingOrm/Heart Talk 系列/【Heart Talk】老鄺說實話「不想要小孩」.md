@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@leonie._yy/post/DXjsA8Ij47i
-作者: leonie._yy
+作者: ["@leonie._yy"]
 status: stub
 ---
 

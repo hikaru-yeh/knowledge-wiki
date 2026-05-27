@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@dutyfree_black/post/DUxidcaE04O
-作者: dutyfree_black
+作者: ["@dutyfree_black"]
 status: wiki
 ---
 

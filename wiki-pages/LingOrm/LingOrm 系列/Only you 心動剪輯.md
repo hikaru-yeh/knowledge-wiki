@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@middle.medium/post/DUdxu4hkt5R
-作者: middle.medium
+作者: ["@middle.medium"]
 status: stub
 ---
 

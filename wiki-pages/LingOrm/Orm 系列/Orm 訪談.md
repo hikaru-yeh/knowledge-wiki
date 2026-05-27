@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@aya.sky.ws/post/DWA1UJ-k_lK
-作者: aya.sky.ws
+作者: ["@aya.sky.ws"]
 status: stub
 ---
 

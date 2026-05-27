@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@shan__wealth/post/DWD6DlvlFQ7
-作者: shan__wealth
+作者: ["@shan__wealth"]
 tags: [Prompt, 提示詞, AI, 技巧]
 status: wiki
 ---

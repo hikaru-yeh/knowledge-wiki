@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@lingorm_land/post/DUNuVkuEW8N
-作者: lingorm_land
+作者: ["@lingorm_land"]
 status: stub
 ---
 

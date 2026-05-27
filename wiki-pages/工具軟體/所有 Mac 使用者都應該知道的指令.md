@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@bushi.neko/post/DX3r-p-EWr5
-作者: bushi.neko
+作者: ["@bushi.neko"]
 status: wiki
 ---
 

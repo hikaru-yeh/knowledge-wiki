@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@al.tsao/post/DW_jhT2Ef1r
-作者: al.tsao（荷蘭 MBA 求職顧問）
+作者: ["@al.tsao（荷蘭 MBA 求職顧問）"]
 status: wiki
 ---
 

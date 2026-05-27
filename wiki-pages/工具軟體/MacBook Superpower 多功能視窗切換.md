@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@soveryai9319/post/DXZaxeSk8hY
-作者: soveryai9319
+作者: ["@soveryai9319"]
 status: wiki
 ---
 

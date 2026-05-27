@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@linmiepii/post/DXItJBMEwal
-作者: linmiepii
+作者: ["@linmiepii"]
 status: wiki
 ---
 

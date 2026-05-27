@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@lo.51127_q/post/DUNZOh8ExpU
-作者: lo.51127_q
+作者: ["@lo.51127_q"]
 status: stub
 ---
 

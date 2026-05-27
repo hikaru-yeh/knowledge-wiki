@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@a11122201/post/DV_QgFjEW83
-作者: a11122201
+作者: ["@a11122201"]
 status: wiki
 ---
 

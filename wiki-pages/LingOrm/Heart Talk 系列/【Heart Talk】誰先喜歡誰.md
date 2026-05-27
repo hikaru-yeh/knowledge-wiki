@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@shihple/post/DXj1TTaD3nv
-作者: shihple
+作者: ["@shihple"]
 status: wiki
 ---
 

@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@flyin___d/post/DVVEyVQCZU6
-作者: flyin___d
+作者: ["@flyin___d"]
 status: stub
 ---
 

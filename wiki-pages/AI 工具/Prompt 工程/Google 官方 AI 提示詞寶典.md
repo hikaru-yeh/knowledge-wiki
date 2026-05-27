@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@minhsuantennis/post/DWjO-3nGUgy
-作者: minhsuantennis
+作者: ["@minhsuantennis"]
 status: wiki
 ---
 

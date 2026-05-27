@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@gracetzeng/post/DUW86jLEm-q
-作者: gracetzeng
+作者: ["@gracetzeng"]
 status: stub
 ---
 

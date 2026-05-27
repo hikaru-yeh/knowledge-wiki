@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@aiworklog/post/DW8kIuHFN3b
-作者: aiworklog
+作者: ["@aiworklog"]
 status: wiki
 ---
 

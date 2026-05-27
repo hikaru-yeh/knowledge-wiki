@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@nini_joanna/post/DUgVQAEE6Cl
-作者: nini_joanna
+作者: ["@nini_joanna"]
 status: wiki
 ---
 

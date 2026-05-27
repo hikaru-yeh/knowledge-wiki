@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@sve2sgr_shh/post/DU45wAXEoRG
-作者: sve2sgr_shh
+作者: ["@sve2sgr_shh"]
 status: wiki
 ---
 

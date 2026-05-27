@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@tutu__1995/post/DV0l-X0D4Uj
-作者: tutu__1995
+作者: ["@tutu__1995"]
 status: wiki
 ---
 

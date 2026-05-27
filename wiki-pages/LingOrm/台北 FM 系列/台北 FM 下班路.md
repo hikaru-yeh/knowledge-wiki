@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@yanaskahi/post/DUON6M3D7KD
-作者: yanaskahi
+作者: ["@yanaskahi"]
 status: wiki
 ---
 

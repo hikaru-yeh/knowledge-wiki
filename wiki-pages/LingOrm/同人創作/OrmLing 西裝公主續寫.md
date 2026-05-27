@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@sundebris/post/DVvv1DrCd76
-作者: sundebris
+作者: ["@sundebris"]
 status: wiki
 ---
 

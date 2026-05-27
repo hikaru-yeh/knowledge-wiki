@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@lolo512bsc/post/DXkBiN8DCX4
-作者: lolo512bsc
+作者: ["@lolo512bsc"]
 status: stub
 ---
 

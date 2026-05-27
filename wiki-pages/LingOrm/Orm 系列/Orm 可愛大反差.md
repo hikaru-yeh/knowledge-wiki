@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@fbtoxicfan/post/DVUD-56EubH
-作者: fbtoxicfan
+作者: ["@fbtoxicfan"]
 status: stub
 ---
 

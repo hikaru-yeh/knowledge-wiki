@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@hsu_jia_/post/DUOMp1xko_x
-作者: hsu_jia_
+作者: ["@hsu_jia_"]
 status: stub
 ---
 

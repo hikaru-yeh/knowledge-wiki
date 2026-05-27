@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@bbonfft/post/DXkDBCADIza
-作者: bbonfft
+作者: ["@bbonfft"]
 status: wiki
 ---
 

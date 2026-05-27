@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@garidojth/post/DXbGofDErvY
-作者: garidojth
+作者: ["@garidojth"]
 status: wiki
 ---
 

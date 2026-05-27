@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@minnieyuqi2024/post/DUfTYjSkevP
-作者: minnieyuqi2024
+作者: ["@minnieyuqi2024"]
 status: stub
 ---
 

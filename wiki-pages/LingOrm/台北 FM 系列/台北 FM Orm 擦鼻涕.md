@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@a.h3175/post/DUQvVqxE73A
-作者: a.h3175
+作者: ["@a.h3175"]
 status: stub
 ---
 

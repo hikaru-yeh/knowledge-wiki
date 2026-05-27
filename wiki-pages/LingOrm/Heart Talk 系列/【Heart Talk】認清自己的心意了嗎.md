@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@lin.2567.in.thai/post/DXjwy0pjGHw
-作者: lin.2567.in.thai
+作者: ["@lin.2567.in.thai"]
 status: stub
 ---
 

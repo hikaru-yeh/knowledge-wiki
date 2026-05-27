@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@0414.com.tww/post/DWnta4wDHTW
-作者: 0414.com.tww
+作者: ["@0414.com.tww"]
 status: wiki
 ---
 

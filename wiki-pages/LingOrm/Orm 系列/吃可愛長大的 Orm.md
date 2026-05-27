@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@abu._.1019/post/DVwHywukqUr
-作者: abu._.1019
+作者: ["@abu._.1019"]
 status: wiki
 ---
 

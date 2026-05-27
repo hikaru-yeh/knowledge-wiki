@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@sweetnayami_ok/post/DUOIKJtiRHk
-作者: sweetnayami_ok
+作者: ["@sweetnayami_ok"]
 status: stub
 ---
 

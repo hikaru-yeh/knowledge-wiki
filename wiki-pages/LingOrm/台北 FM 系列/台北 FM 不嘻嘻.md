@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@noratmov94/post/DUNpFGRjwu8
-作者: noratmov94
+作者: ["@noratmov94"]
 status: stub
 ---
 

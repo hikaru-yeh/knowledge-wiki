@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@tomadd__2025/post/DX54RQUD2nu
-作者: tomadd__2025
+作者: ["@tomadd__2025"]
 tags: [Mac, 工具軟體, 效率]
 status: wiki
 ---

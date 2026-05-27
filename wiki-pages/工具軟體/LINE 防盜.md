@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@yee_blworld/post/DWkzewNkxJ9
-作者: yee_blworld
+作者: ["@yee_blworld"]
 status: wiki
 ---
 

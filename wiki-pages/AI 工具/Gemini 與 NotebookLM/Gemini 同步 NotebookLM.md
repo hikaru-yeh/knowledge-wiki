@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@peacesenpai_1015/post/DW-HS1NEtbv
-作者: peacesenpai_1015
+作者: ["@peacesenpai_1015"]
 status: wiki
 ---
 

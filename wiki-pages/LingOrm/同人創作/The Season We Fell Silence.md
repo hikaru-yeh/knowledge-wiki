@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@ifyou.000/post/DP0G-Qfkl6l
-作者: ifyou.000
+作者: ["@ifyou.000"]
 status: stub
 ---
 

@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@should_wecould_igone/post/DXlieCOFOoE
-作者: should_wecould_igone
+作者: ["@should_wecould_igone"]
 status: stub
 ---
 

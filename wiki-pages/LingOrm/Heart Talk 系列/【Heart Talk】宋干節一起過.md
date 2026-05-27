@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@cookiencream24_/post/DXj68LJAeJw
-作者: cookiencream24_
+作者: ["@cookiencream24_"]
 status: stub
 ---
 

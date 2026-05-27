@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@whatslulu/post/DWqEHIwDWu4
-作者: whatslulu
+作者: ["@whatslulu"]
 status: wiki
 ---
 

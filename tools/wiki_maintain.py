@@ -1953,6 +1953,92 @@ def collect_frontmatter_issues(pages: list[PageRecord]) -> list[FrontmatterIssue
     return issues
 
 
+def normalize_author_in_file(path: Path, dry_run: bool = True) -> tuple[bool, str, str]:
+    """Fix 作者 field in a single wiki page file.
+
+    Returns (changed, old_value, new_value).
+    Only touches the 作者: line in frontmatter block. Leaves everything else intact.
+    """
+    text = read_text(path)
+    lines = text.splitlines(keepends=True)
+
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        return False, "", ""
+
+    end_index = None
+    for i, line in enumerate(lines[1:], start=1):
+        if line.rstrip("\r\n") == "---":
+            end_index = i
+            break
+    if end_index is None:
+        return False, "", ""
+
+    for i in range(1, end_index):
+        if ":" not in lines[i]:
+            continue
+        key, value = lines[i].split(":", 1)
+        if key.strip() != "作者":
+            continue
+
+        raw = value.strip()
+        if not raw or raw.startswith("["):
+            return False, raw, raw
+
+        handle = raw.lstrip("@")
+        canonical = f'["@{handle}"]'
+
+        if not dry_run:
+            ending = ""
+            if lines[i].endswith("\r\n"):
+                ending = "\r\n"
+            elif lines[i].endswith("\n"):
+                ending = "\n"
+            lines[i] = f"作者: {canonical}{ending}"
+            path.write_text("".join(lines), encoding="utf-8")
+
+        return True, raw, canonical
+
+    return False, "", ""
+
+
+def command_author_fix(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    wiki_dir = Path(args.wiki_dir)
+    pages = load_wiki_pages(root, wiki_dir)
+    issues = collect_frontmatter_issues(pages)
+
+    fixable = [i for i in issues if i.rule == "invalid-author-field-type"]
+
+    if not fixable:
+        print("No author issues to fix.")
+        return 0
+
+    dry_run = not args.apply
+    mode = "DRY RUN" if dry_run else "APPLYING"
+    print(f"[{mode}] Found {len(fixable)} author issues\n")
+
+    fixed = 0
+    errors: list[tuple[str, str]] = []
+    for issue in fixable:
+        page_path = root / issue.path
+        try:
+            changed, old, new = normalize_author_in_file(page_path, dry_run=dry_run)
+            if changed:
+                fixed += 1
+                print(f"  {'WOULD FIX' if dry_run else 'FIXED'}: {issue.path}")
+                print(f"    {old!r} → {new!r}")
+        except Exception as exc:
+            errors.append((issue.path, str(exc)))
+            print(f"  ERROR: {issue.path}: {exc}")
+
+    print(f"\n{'Would fix' if dry_run else 'Fixed'}: {fixed}/{len(fixable)}")
+    if errors:
+        print(f"Errors: {len(errors)}")
+    if dry_run and fixed:
+        print("\nRe-run with --apply to write changes.")
+    return 0
+
+
 @dataclass(frozen=True)
 class CanonicalGuardIssue:
     canonical: str  # repo-relative canonical path (forward slashes)
@@ -2389,6 +2475,16 @@ def build_parser() -> argparse.ArgumentParser:
     canonical_guard.add_argument("--report", action="store_true", help="Write a dated canonical-guard Markdown report.")
     canonical_guard.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
     canonical_guard.set_defaults(func=command_canonical_guard)
+
+    author_fix = subparsers.add_parser(
+        "author-fix",
+        help="Fix bare-string 作者 fields to canonical [\"@handle\"] format.",
+    )
+    author_fix.add_argument(
+        "--apply", action="store_true",
+        help="Actually write fixes (default is dry-run).",
+    )
+    author_fix.set_defaults(func=command_author_fix)
 
     return parser
 

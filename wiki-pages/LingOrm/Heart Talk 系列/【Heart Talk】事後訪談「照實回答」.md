@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@vein_0o/post/DXjGTGpCsZx
-作者: vein_0o
+作者: ["@vein_0o"]
 status: stub
 ---
 

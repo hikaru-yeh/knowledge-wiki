@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@smallbad_8059/post/DV6m5wyky5X
-作者: smallbad_8059
+作者: ["@smallbad_8059"]
 status: wiki
 ---
 

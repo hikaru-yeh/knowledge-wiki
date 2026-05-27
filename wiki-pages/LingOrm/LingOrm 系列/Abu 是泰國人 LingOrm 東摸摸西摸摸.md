@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@zoemote1911/post/DUOEaMBkXub
-作者: zoemote1911
+作者: ["@zoemote1911"]
 status: stub
 ---
 

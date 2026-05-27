@@ -1,6 +1,6 @@
 ---
 網址: https://www.threads.com/@bboy_anlee/post/DWgcUTwjOMZ
-作者: bboy_anlee
+作者: ["@bboy_anlee"]
 status: wiki
 ---
 
