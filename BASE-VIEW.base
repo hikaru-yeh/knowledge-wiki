@@ -1,18 +1,19 @@
 filters:
   and:
-    - file.folder == "wiki-pages/index"
+    - file.folder.startsWith("wiki-pages")
+    - status == "stub"
 views:
   - type: table
     name: 表格
     order:
       - file.name
-      - author
-      - clip_type
-      - url
       - file.folder
+      - 網址
     sort:
       - property: file.folder
         direction: ASC
+      - property: 網址
+        direction: DESC
       - property: author
         direction: DESC
       - property: 收藏類型

@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "mcp__notion__notion-search",
-      "mcp__notion__notion-fetch"
+      "mcp__notion__notion-fetch",
+      "Bash(python -c ' *)",
+      "Bash(powershell -Command \"rg -n '（📌 stub）' wiki-pages\\\\index | rg -v 'LingOrm-索引'\")"
     ]
   }
 }

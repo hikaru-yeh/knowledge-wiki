@@ -292,9 +292,9 @@ def infer_cross_references(path: Path) -> list[str]:
     if "lingorm" in normalized_parts:
         return ["- [[LingOrm-索引]]：LingOrm 分類總覽"]
     if "ai 工具" in normalized_parts:
-        return ["- [[AI 工具索引]]：AI 工具分類總覽"]
+        return ["- [[AI 工具-索引]]：AI 工具分類總覽"]
     if "工具軟體" in normalized_parts:
-        return ["- [[工具軟體索引]]：工具軟體分類總覽"]
+        return ["- [[工具軟體-索引]]：工具軟體分類總覽"]
     if "求職履歷" in normalized_parts:
         return ["- [[求職履歷-索引]]：求職履歷分類總覽"]
     if "旅遊美食" in normalized_parts:

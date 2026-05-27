@@ -24,6 +24,5 @@ status: wiki
 
 ## Cross References
 
-- [[減少 AI 幻覺]]：限制腦補、降低迎合式推論
-- [[提示詞技巧]]：Prompt 設計與結構化提問整理
+- [[提示詞技巧]]：減少幻覺策略、個人化 System Prompt、結構化提問整理
 - [[AI 工具-索引]]：AI 工具分類總覽

@@ -27,5 +27,5 @@ status: wiki
 ## Cross References
 
 - [[面試準備]]: 面試流程化與 Why Should We Hire You 公式
-- [[AI 助攻履歷從0面試到5面試]]: 七個 Prompt 版本
+- [[履歷優化]]: AI 助攻七個 Claude Prompt、故事決勝負
 

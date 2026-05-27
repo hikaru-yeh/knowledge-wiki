@@ -4,53 +4,24 @@
     "type": "split",
     "children": [
       {
-        "id": "f23ae3331736f311",
+        "id": "10ef8ceaa56e8a39",
         "type": "tabs",
         "children": [
           {
-            "id": "d5f7258885d4be7a",
+            "id": "20b64f8da4fe7b7d",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "wiki-pages/index/session-筆記-索引.md",
+                "file": "wiki-pages/AI 工具/AI Agent/9 個你可能不知道的 Claude Code 神器.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "session-筆記-索引"
-            }
-          },
-          {
-            "id": "c0099c596e374c1b",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "wiki-pages/index/session-筆記-索引.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "session-筆記-索引"
-            }
-          },
-          {
-            "id": "34df50cfc7cf1e18",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "wiki-pages/專案管理/adr/adr_bridge_creation_via_update.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "adr_bridge_creation_via_update"
+              "title": "9 個你可能不知道的 Claude Code 神器"
             }
           }
-        ],
-        "currentTab": 2
+        ]
       }
     ],
     "direction": "vertical"
@@ -82,8 +53,8 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "",
-                "matchingCase": true,
+                "query": "9 個你可能不知道的 Claude Code 神器",
+                "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
                 "extraContext": false,
@@ -102,12 +73,23 @@
               "icon": "lucide-bookmark",
               "title": "書籤"
             }
+          },
+          {
+            "id": "7464666d3b2cd421",
+            "type": "leaf",
+            "state": {
+              "type": "notebook-navigator",
+              "state": {},
+              "icon": "notebook-navigator",
+              "title": "筆記本導覽器"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "horizontal",
-    "width": 283.5
+    "width": 230.5
   },
   "right": {
     "id": "a27d63b986174301",
@@ -193,13 +175,23 @@
               "icon": "lucide-list",
               "title": "粉藍狂熱，00k心繫烤乳豬 的大綱"
             }
+          },
+          {
+            "id": "b810fde245364776",
+            "type": "leaf",
+            "state": {
+              "type": "gemini-agent-view",
+              "state": {},
+              "icon": "sparkles",
+              "title": "Agent Mode"
+            }
           }
-        ]
+        ],
+        "currentTab": 5
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -209,47 +201,50 @@
       "daily-notes:開啟今天的每日筆記": false,
       "templates:插入模板": false,
       "command-palette:開啟命令面板": false,
-      "bases:建立新的 base": false
+      "bases:建立新的 base": false,
+      "notebook-navigator:筆記本導覽器": false,
+      "gemini-scribe:Gemini Scribe: Agent Mode": false,
+      "obsidian-excalidraw-plugin:新建繪圖檔案": false
     }
   },
-  "active": "34df50cfc7cf1e18",
+  "active": "20b64f8da4fe7b7d",
   "lastOpenFiles": [
-    "wiki-pages/專案管理/projects/personal_wiki.md",
-    "wiki-pages/專案管理/projects/personal_wiki_v2.md",
-    "wiki-pages/session-筆記/Shane-Wiki-人物消歧-2026-05-20.md",
-    "wiki-pages/專案管理/adr/adr_bridge_page_pattern.md",
-    "wiki-pages/專案管理/adr/adr_rules_extraction.md",
-    "wiki-pages/專案管理/adr/adr_two_layer_architecture.md",
-    "wiki-pages/專案管理/adr/README.md",
-    "wiki-pages/專案管理/adr/adr_bridge_creation_via_update.md",
-    "wiki-pages/專案管理/adr/adr_crossproject_kb_location.md",
-    "wiki-pages/專案管理/errors/README.md",
-    "wiki-pages/session-筆記/AgentMemory-vs-DriftAI-2026-05-15.md",
-    "wiki-pages/專案管理/projects/scribe_treads_saved.md",
-    "wiki-pages/健康生活/健身動作.md",
-    "wiki-pages/健康生活/身心保健.md",
-    "wiki-pages/求職履歷/AI 攻略履歷面試錄取率翻倍.md",
-    "wiki-pages/求職履歷/履歷優化.md",
-    "wiki-pages/求職履歷/面試到最後被問到 WhyShouldWeHireYou.md",
-    "wiki-pages/求職履歷/面試準備.md",
-    "wiki-pages/專案管理/projects/data_pipeline.md",
-    "CLAUDE.md.tmp.6608.6582cf7d3c1b",
-    "CLAUDE.md.tmp.6608.22b31958afa7",
-    "CLAUDE.md.tmp.6608.2cb80092ee7c",
-    "CLAUDE.md.tmp.6608.90933ccac376",
-    "CLAUDE.md.tmp.6608.a6cf1433440d",
-    "wiki-pages/log.md",
-    "wiki-pages/session-筆記/GitHub-Portfolio-Repo-Workflow-2026-05-19.md",
-    "wiki-pages/session-筆記/AgentMemory-Windows-Setup-2026-05-15.md",
-    "wiki-pages/專案管理/projects/career_ops.md",
-    "wiki-pages/index/session-筆記-索引.md",
-    "wiki-pages/專案管理/daily-recap.md",
-    "wiki-pages/專案管理/projects/claude_context_graphify_coexist.md",
-    "wiki-pages/日誌.md.tmp.52776.1778852498258",
-    "未命名.base",
-    "wiki-pages/日誌.md.tmp.4620.1778851841287",
-    "wiki-pages/index/session-筆記-索引.md.tmp.4620.1778851791836",
-    "wiki-pages/session-筆記/AgentMemory-Windows-Setup-2026-05-15.md.tmp.4620.1778851775222",
+    "wiki-pages/log.example.md",
+    "wiki-pages/index/example-index.md",
+    "wiki-pages/example-topic/example-wiki-page.md",
+    "wiki-pages/example-topic",
+    "wiki-pages/README.md",
+    "raw/examples/example-source.md",
+    "raw/examples",
+    "raw/README.md",
+    "README.md",
+    "wiki-pages/AI 工具/AI Agent/5個必裝 Codex Skill 體驗升級.md",
+    "wiki-pages/AI 工具/Claude-整合-10-大工具，AI-幫你做.md",
+    "tasks/maintenance-reports/canonical-guard-2026-05-27-2.md",
+    "tasks/maintenance-reports/status-audit-2026-05-27-3.md",
+    "tasks/maintenance-reports/canonical-guard-2026-05-27.md",
+    "tools/wiki_maintain.py.tmp.41500.45aac18116c8",
+    "tools/wiki_maintain.py.tmp.41500.8e3a74f409c8",
+    "tools/wiki_maintain.py.tmp.41500.fd621a0061c8",
+    "tasks/maintenance-reports/status-audit-2026-05-27-2.md",
+    "tasks/maintenance-reports/status-audit-2026-05-27.md",
+    "tools/wiki_maintain.py.tmp.41500.5d2d55c44f57",
+    "tools/wiki_maintain.py.tmp.41500.be6f26af1ea1",
+    "tools/wiki_maintain.py.tmp.41500.2db609357648",
+    "tools/wiki_maintain.py.tmp.41500.40d09a8751c0",
+    "tools/wiki_maintain.py.tmp.41500.e271c449b184",
+    "wiki-pages/AI 工具/AI流程圖神器：一句話搞定多種風格.md",
+    "wiki-pages/AI 工具/AI伴學：知識壁壘已破.md",
+    "wiki-pages/AI 工具/擺脫糊字！AI簡報組合技.md",
+    "wiki-pages/AI 工具/用Obsidian建立你的LLM知識庫.md",
+    "wiki-pages/AI 工具/Gemini 與 NotebookLM/Gemini 個人化指令設定.md",
+    "wiki-pages/AI 工具/Gemini 與 NotebookLM/NotebookLM 外掛李宏毅24小時家教.md",
+    "wiki-pages/AI 工具/AI-員工速成：Claude-+-Obsidian-密技大公開.md",
+    "wiki-pages/AI 工具/框架工程：AI優先，重塑你的組織.md",
+    "wiki-pages/AI 工具/三周24-7-AI-Agent開發團隊：架構與演進.md",
+    "wiki-pages/AI 工具/Gemini 與 NotebookLM/Gemini 同步 NotebookLM.md",
+    "wiki-pages/LingOrm/台北 FM 系列/台北 FM 下班路.md",
+    "wiki-pages/LingOrm/台北 FM 系列/台北 FM 兩個人一起睡.md",
     "Pasted image 20260512002944.png",
     "Pasted image 20260512002933.png",
     "Pasted image 20260512002922.png",

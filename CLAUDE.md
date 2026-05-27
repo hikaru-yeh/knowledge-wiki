@@ -73,11 +73,12 @@ knowledge-wiki/
 
 ingest 任何來源前，必須先判斷其類型，採用對應的保留度。預設行為是「整理 + 壓縮」，但對技術型內容會破壞知識可檢索性，必須依分級調整。
 
-### Level 1: 觀點型（threads 短貼文、推文、心得）
+### Level 1: 觀點型（threads 純觀點貼文、推文、心得）
 
 - 可以摘要、可以濃縮
 - 重點在「這個人說了什麼觀點」
 - 適用：個人感想、短評、社群討論
+- **不含**可執行指令、步驟清單、設定範例；一旦出現上述特徵，自動升為 Level 2
 
 ### Level 2: 教學型（部落格文章、教程、how-to）
 
@@ -114,9 +115,18 @@ status: stub | wiki | reference
 
 ### ingest 預設 status
 
-- threads-saved 短貼文 → `stub`（除非使用者明確要求消化）
+- threads-saved 純觀點型貼文（Level 1）→ `stub`
+- threads-saved 教學型文章（Level 2，含指令/步驟/設定範例）→ `wiki`
 - 教學文章（Level 2） → `wiki`
 - github repo / 官方文件（Level 3） → `reference`
+
+> **threads Level 2 判斷準則**：符合以下任一條件視為 Level 2：
+> - 含可執行 CLI 指令或程式碼片段
+> - 含步驟編號或明確操作流程（如「第一步 / 第二步」「1. 2. 3.」）
+> - 含設定檔範例或 API 參數說明
+> - 標題明確為「如何…」「X 種方法」「N 個技巧」
+>
+> 否則預設 Level 1（stub）。
 
 ### 索引顯示規則
 
@@ -150,28 +160,39 @@ status: stub | wiki | reference
    - 該頁面在索引的「重點」欄位草稿（須符合「重點欄位強制規則」）
 4. 等待使用者核准。
 5. 建立或更新相關 wiki 頁面。
-5.5 執行 `gbrain sync --source knowledge-wiki`（PGLite 下同步執行，必須等完成，且不可與其他 gbrain DB 指令並行）。
-6. 視需要更新交叉參照；gbrain 會在 sync / link extraction 後回填可解析連結，人工仍需補正確的 `[[wikilinks]]`。
+6. 視需要更新交叉參照；人工仍需補正確的 `[[wikilinks]]`。
 7. 在 `wiki-pages/log.md` 追加一筆 log：
    - `## [YYYY-MM-DD] ingest | <document name> | status: <stub/wiki/reference>`
 8. 當頁面的建立或刪除會改變索引時，更新 `wiki-pages/index/總索引.md` 的狀態儀表板與相關索引頁。
 
 #### threads-saved frontmatter 規則
 
-凡是從 `raw/threads-saved/` ingest 的頁面，建立 wiki 頁面時必須使用以下格式：
+從 `raw/threads-saved/` ingest 的頁面，frontmatter 使用以下格式，`status` 依內容等級填入（Level 1 → `stub`，Level 2 → `wiki`）：
 
 ```markdown
 ---
 網址: []
 作者: []
 tags: []
-status: stub
+status: stub  # Level 1（純觀點）；若為 Level 2（含指令/步驟/範例）改為 wiki
 ---
 
 ## Main Content
 
 ...
 ```
+
+#### frontmatter 作者欄格式規則
+
+- `作者:` 欄位必須保持為合法 YAML。
+- 單一作者若使用陣列格式，必須加雙引號：
+  - 正確：`作者: ["@account"]`
+  - 正確：`作者: ["account"]`
+  - 正確：`作者: []`
+  - 錯誤：`作者: [@account]`
+  - 錯誤：`作者: [account]`
+- 若作者是從 Threads URL 自動補值，預設補成單一字串陣列並加雙引號。
+- 修改 frontmatter 後，必須確認整份 frontmatter 仍可被 YAML parser 正常解析。
 
 #### threads-saved 作者補值規則
 
@@ -197,7 +218,6 @@ status: stub
    - 索引「重點」欄位的新版內容
 5. 等待使用者核准。
 6. 改寫頁面內容，更新 frontmatter `status: stub → wiki` 或 `stub → reference`。
-6.5 執行 `gbrain sync --source knowledge-wiki`（同步，等完成）。
 7. 更新索引：移除 `（📌 stub）` 標記，補上完整「重點」欄位。
 8. 更新 `總索引.md` 的狀態儀表板。
 9. log：`## [YYYY-MM-DD] promote | <page> | stub → <wiki/reference>`
@@ -228,7 +248,6 @@ status: stub
    - 是否需拆分成多頁
 4. 等待使用者核准。
 5. 覆寫原頁面（保留原 frontmatter 的 tags / 網址 / 作者，但更新 status）。
-5.5 執行 `gbrain sync --source knowledge-wiki`（同步，等完成）。
 6. log：`## [YYYY-MM-DD] re-ingest | <page> | reason: <缺什麼>`
 
 ### Reorganization
@@ -292,7 +311,6 @@ status: stub
    - 是否需要更新索引或交叉參照
 4. 等待使用者核准。
 5. 更新相關 wiki 頁面。
-5.5 執行 `gbrain sync --source knowledge-wiki`（同步，等完成）。
 6. 若索引受影響，更新 `wiki-pages/index/總索引.md` 或子索引。
 7. 在 `wiki-pages/log.md` 追加：
    - `## [YYYY-MM-DD] update | <summary>`
@@ -519,8 +537,6 @@ Agent 職責：
 ## Guardrails
 
 - 建立新 wiki 頁面時，不要漏掉索引更新（含「重點」欄位）。
-- 寫入 `wiki-pages/` 後，使用 `gbrain sync --source knowledge-wiki` 更新索引；不要使用 `gbrain embed --background` 當同步步驟。
-- 所有 gbrain DB 指令必須循序執行。若遇到 PGLite lock timeout，先檢查是否已有 `gbrain` / `bun ... gbrain` 行程在跑。
 - 不要因為硬編碼檔名而建立重複的 overview 頁面。
 - 除非使用者明確要求，否則不要將輔助檔案視為知識內容。
 - 當不確定時，優先在 wiki 頁面中保留來源內容，並在周圍加上結構，而不是過度壓縮。

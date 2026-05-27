@@ -9,7 +9,7 @@
 
 | 檔案 | 最後更新 | 說明 |
 |------|---------|------|
-| _(尚無)_ | — | project-wrap 執行後會在此列出 |
+| [project_crawl-the-threads.md](project_crawl-the-threads.md) | 2026-05-22 | Threads 收藏自動化流水線：CDP scrape → Gemini classify → markdown notes → auto-unsave |
 
 ## 格式模板
 

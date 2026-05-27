@@ -21,3 +21,9 @@
 | ---- | ---- |
 | [[Shane-Wiki-人物消歧-2026-05-20]] | Shane Wiki 人物消歧實作：`canonical_name`、`same_as`、`possible_duplicate_of`、`disambiguation_queue` 與 `person_j`→`person_jenny` 合併流程 |
 
+
+## 本機自動化 / Watch 腳本
+
+| 文件 | 重點 |
+| ---- | ---- |
+| [[Dagu-vs-Process-Compose-vs-Node-RED-2026-05-21]] | 比較 Dagu、Semaphore UI、Process Compose、Node-RED、Rundeck、PM2、watchexec 管理 Windows watch 腳本與常駐命令 dashboard；保留 watchexec 與 process-compose.yaml 範例 |
