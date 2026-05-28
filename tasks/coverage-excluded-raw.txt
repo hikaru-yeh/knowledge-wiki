@@ -4,3 +4,5 @@
 raw/threads-iphone/threads-unknown-20260511-120523.md
 raw/threads-saved/有用免費證照.md
 raw/threads-saved/職涯分析Prompt.md
+raw/threads/神聖無碼帝國萬歲！.md
+raw/threads/147個AI員工，一鍵部署玩轉.md

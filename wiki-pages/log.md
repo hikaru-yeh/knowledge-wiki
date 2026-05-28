@@ -364,3 +364,8 @@ Batch D2 最後 3 頁全部從 `status: wiki` 降回 `status: stub`：`AI-員工
 - 113 個 stub 檔（僅有 frontmatter，無內文）以書籤形式列於各索引
 - 91 個有實際內容的檔案整理為 wiki 頁面
 - 結構參照 `ai-tips & notes\wiki\` 現有分類
+
+## [2026-05-28] update | session-筆記-索引.md frontmatter fix + coverage exclusion list additions
+
+- session-筆記-索引.md：補 `status: wiki` frontmatter，清除 CI gate error=1
+- coverage-excluded-raw.txt：新增 raw/threads/神聖無碼帝國萬歲！.md（已存於動漫分類）和 raw/threads/147個AI員工，一鍵部署玩轉.md（user 刪除）

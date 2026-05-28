@@ -1,3 +1,7 @@
+---
+status: wiki
+---
+
 # session-筆記-索引
 
 ← [[總索引]]
