@@ -2341,7 +2341,7 @@ class ScanResult:
     coverage: CoverageResult
     duplicates: DuplicatesResult
     blocked: list[BlockedRecord]
-    inject_pending: "InjectPendingResult | None" = None
+    inject_pending: InjectPendingResult | None = None
 
 
 def _section_summary(name: str, errors: int = 0, warnings: int = 0, info: int = 0) -> ScanSectionSummary:
@@ -2352,7 +2352,7 @@ def collect_scan(
     root: Path,
     wiki_dir: Path,
     raw_dir: Path,
-    pending_dir: "Path | None" = None,
+    pending_dir: Path | None = None,
 ) -> ScanResult:
     ip = (
         collect_inject_pending(pending_dir, root, wiki_dir)
@@ -2566,8 +2566,7 @@ def command_scan(args: argparse.Namespace) -> int:
     root = args.root.resolve()
     wiki_dir = Path(args.wiki_dir)
     raw_dir = Path(args.raw_dir)
-    pending_dir_str = getattr(args, "pending_dir", None)
-    pending_dir = Path(pending_dir_str).resolve() if pending_dir_str else None
+    pending_dir = Path(args.pending_dir).resolve() if args.pending_dir else None
 
     print("scan: running all report-only checks...")
     result = collect_scan(root, wiki_dir, raw_dir, pending_dir=pending_dir)
