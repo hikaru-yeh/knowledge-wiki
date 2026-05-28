@@ -2039,6 +2039,146 @@ def command_author_fix(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# bare-link-fix: rewrite ambiguous [[wikilinks]] to explicit relative links
+# ---------------------------------------------------------------------------
+
+
+def collect_ambiguous_bare_links(
+    root: Path, wiki_dir: Path, raw_dir: Path
+) -> tuple[list[IndexIssue], dict[str, list[PageRecord]]]:
+    """Return ambiguous-bare-link issues and a stem->pages lookup."""
+    lint = collect_index_lint(root, wiki_dir, raw_dir)
+    issues = [i for i in lint.issues if i.code == "ambiguous-bare-link"]
+    pages = load_wiki_pages(root, wiki_dir)
+    by_stem: dict[str, list[PageRecord]] = {}
+    for page in pages:
+        by_stem.setdefault(page.stem, []).append(page)
+    return issues, by_stem
+
+
+def resolve_bare_link_replacement(
+    index_file: Path, target_stem: str, pages_by_stem: dict[str, list[PageRecord]]
+) -> str | None:
+    """Build the explicit Markdown link text for a bare wikilink target.
+
+    Returns e.g. ``[title](<../AI 工具/page.md>)`` or *None* if the target
+    cannot be resolved to a single wiki page.
+    """
+    candidates = pages_by_stem.get(target_stem, [])
+    # Filter out index pages – the link should point to a content page.
+    non_index = [p for p in candidates if not is_index_page(p)]
+    if len(non_index) == 1:
+        target_page = non_index[0]
+    elif len(candidates) == 1:
+        target_page = candidates[0]
+    else:
+        return None  # ambiguous or missing
+
+    # Compute a relative path from the index file's directory to the target.
+    try:
+        rel = Path(target_page.path.resolve()).relative_to(
+            index_file.parent.resolve()
+        )
+    except ValueError:
+        # Fallback: use os-level relpath
+        import os
+
+        rel = Path(os.path.relpath(target_page.path.resolve(), index_file.parent.resolve()))
+
+    rel_posix = rel.as_posix()
+    return f"[{target_stem}](<{rel_posix}>)"
+
+
+def fix_bare_links_in_file(
+    file_path: Path,
+    targets: set[str],
+    pages_by_stem: dict[str, list[PageRecord]],
+    dry_run: bool = True,
+) -> list[tuple[str, str, str]]:
+    """Rewrite ambiguous bare wikilinks in *file_path*.
+
+    Returns a list of (target, old_fragment, new_fragment) for each replacement.
+    """
+    text = read_text(file_path)
+    replacements: list[tuple[str, str, str]] = []
+
+    def _replace(match: re.Match[str]) -> str:
+        inner = match.group(1)
+        target = wikilink_target(inner)
+        if target not in targets:
+            return match.group(0)
+        new_link = resolve_bare_link_replacement(file_path, target, pages_by_stem)
+        if new_link is None:
+            return match.group(0)
+        replacements.append((target, match.group(0), new_link))
+        return new_link
+
+    new_text = WIKILINK_RE.sub(_replace, text)
+
+    if not dry_run and replacements:
+        file_path.write_text(new_text, encoding="utf-8")
+
+    return replacements
+
+
+def command_bare_link_fix(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    wiki_dir = Path(args.wiki_dir)
+    raw_dir = Path(args.raw_dir)
+
+    issues, pages_by_stem = collect_ambiguous_bare_links(root, wiki_dir, raw_dir)
+
+    if not issues:
+        print("No ambiguous bare links to fix.")
+        return 0
+
+    # Group issues by file so we process each file once.
+    from collections import defaultdict
+
+    by_file: dict[str, set[str]] = defaultdict(set)
+    for issue in issues:
+        by_file[issue.path].add(issue.target)
+
+    dry_run = not args.apply
+    mode = "DRY RUN" if dry_run else "APPLYING"
+    print(f"[{mode}] Found {len(issues)} ambiguous bare links across {len(by_file)} files\n")
+
+    total_fixed = 0
+    all_results: list[tuple[str, str, str, str]] = []  # (file, target, old, new)
+    errors: list[tuple[str, str]] = []
+
+    for rel_path, targets in sorted(by_file.items()):
+        file_path = root / rel_path
+        try:
+            replacements = fix_bare_links_in_file(
+                file_path, targets, pages_by_stem, dry_run=dry_run
+            )
+            for target, old, new in replacements:
+                total_fixed += 1
+                all_results.append((rel_path, target, old, new))
+        except Exception as exc:
+            errors.append((rel_path, str(exc)))
+            print(f"  ERROR: {rel_path}: {exc}")
+
+    # Print results
+    for rel_path, target, old, new in all_results:
+        verb = "WOULD FIX" if dry_run else "FIXED"
+        print(f"  [{verb}] {rel_path}")
+        print(f"    {old} -> {new}")
+
+    # Verify that resolved paths point to real files
+    unresolved = len(issues) - total_fixed
+    print(f"\n{'Would fix' if dry_run else 'Fixed'}: {total_fixed}/{len(issues)}")
+    if unresolved:
+        print(f"Unresolved (ambiguous or missing): {unresolved}")
+    if errors:
+        print(f"Errors: {len(errors)}")
+    if dry_run and total_fixed:
+        print("\nRe-run with --apply to write changes.")
+    return 0
+
+
 @dataclass(frozen=True)
 class CanonicalGuardIssue:
     canonical: str  # repo-relative canonical path (forward slashes)
@@ -2485,6 +2625,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Actually write fixes (default is dry-run).",
     )
     author_fix.set_defaults(func=command_author_fix)
+
+    bare_link_fix = subparsers.add_parser(
+        "bare-link-fix",
+        help="Fix ambiguous bare [[wikilinks]] to explicit relative Markdown links.",
+    )
+    bare_link_fix.add_argument(
+        "--apply", action="store_true",
+        help="Actually write fixes (default is dry-run).",
+    )
+    bare_link_fix.set_defaults(func=command_bare_link_fix)
 
     return parser
 

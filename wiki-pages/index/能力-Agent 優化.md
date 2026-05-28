@@ -13,7 +13,7 @@ status: wiki
 **情境 A**：[[工作流與配置]] → [[CLAUDE.md 與記憶設定]] → [[MCP 工具]]
 **情境 B**：[[Skill 設計]] + [[Token 優化]] + [[Claude Code 自動開發15訣]]
 **情境 C**：[[planning-with-files]] + [[obra-superpowers]] + [[agent-skills]]
-**情境 D**：[[drift_ai]] + [[AI 多模型協作審碼抓漏]] + [[kinggyusuh-gemini-search-cc]]
+**情境 D**：[[drift_ai]] + [AI 多模型協作審碼抓漏](<../AI 工具/AI Agent/AI 多模型協作審碼抓漏.md>) + [[kinggyusuh-gemini-search-cc]]
 
 ## 新手入門
 
@@ -39,7 +39,7 @@ status: wiki
 |------|----------|----------|
 | [[Claude Code 脆文實作50招]] | 要一次收斂 Skill、Token、工具整合與 workflow 實戰 tips | 可當總表，再回跳到各主題深挖 |
 | [[Claude 蒸餾 Skill-Set 大禮包]] | 想把他人的流程、角色或專長快速蒸餾成可重用 Skill | 與 [[Skill 設計]] 搭配，補驗證與結構化 |
-| [[AI 多模型協作審碼抓漏]] | 想讓 Claude / Codex / Gemini 分工審碼與實作 | 可加上 [[drift_ai]] 管理 agent 間 handoff |
+| [AI 多模型協作審碼抓漏](<../AI 工具/AI Agent/AI 多模型協作審碼抓漏.md>) | 想讓 Claude / Codex / Gemini 分工審碼與實作 | 可加上 [[drift_ai]] 管理 agent 間 handoff |
 | [[drift_ai]] | 常在 Claude Code、Codex、Cursor 等 agent 之間切換任務 | 適合作為跨工具工作流的脈絡保存層 |
 
 ## 參考實作

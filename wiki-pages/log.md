@@ -4,6 +4,14 @@ status: wiki
 
 # Wiki 操作日誌
 
+## [2026-05-28] ingest | 工程師最常用的 12 個 Claude Code 指令 | status: wiki
+
+來源：raw/threads-iphone/threads-unknown-20260511-120328.md 與 threads-unknown-20260511-120523.md（兩個 raw 檔指向同一 URL）。WebFetch 成功抓取部分內容：帖文可見文字、互動數據、主題確認（12 個 Claude Code 指令快捷鍵）；速查表以圖片呈現無法抽取文字。合併成一頁 wiki，存於 wiki-pages/AI 工具/Claude-Code/工程師最常用的 12 個 Claude Code 指令.md，作者 @this.web，Level 2（含指令/速查表），status: wiki。AI 工具-索引 Claude Code 社群帖子區塊新增條目。
+
+## [2026-05-28] reorganization | Delete 3 empty wiki pages; promote 擲杯技巧 stub→wiki; keep 有用免費證照 & 職涯分析Prompt as stubs (Threads auth required, raw files empty)
+
+Deleted: wiki-pages/AI 工具/147個AI員工，一鍵部署玩轉.md、wiki-pages/健康生活/壺鈴運動.md、wiki-pages/健康生活/練肩.md。Promoted: wiki-pages/生活雜記/擲杯技巧.md（stub→wiki，用戶已手動補全內容）。Updated indexes: AI 工具-索引（移除 147 條目）、健康生活-索引（移除壺鈴運動 & 練肩）、生活雜記-索引（擲杯技巧升格並補重點欄）。
+
 ## [2026-05-27] qa | Post-cleanup QA closeout
 
 AI 工具直層 content quality cleanup 完成收斂。已完成批次：D1（5 stub）/ D2（8 頁：2 enriched + 1 noise-cleaned + 5 stub）/ E0（2 index fix）/ E1（9 作者欄）/ E2（2 off-topic → 生活雜記）/ E3B（3 stub）/ E4A-1（4 re-ingest：3 reference + 1 wiki）/ E4A-2（1 Substack re-ingest）。Final state：Wiki 357 / Reference 28 / Stub 99 / Total 484；AI 工具 208/23/13=244。Remaining 3 頁 blocked on Threads refetch（AI專家員工庫 / Obsidian-+-Claudian / Claude-整合-10-大工具）+ 5 blocked content gap stubs + index duplicate H2 tooling follow-up。

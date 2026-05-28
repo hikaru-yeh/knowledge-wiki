@@ -10,7 +10,7 @@ status: wiki
 
 ## 推薦組合
 
-**情境 A**：[[工作流與配置]] → [[Claude 高手用法設定即執行]] → [[AI 多模型協作審碼抓漏]]
+**情境 A**：[[工作流與配置]] → [[Claude 高手用法設定即執行]] → [AI 多模型協作審碼抓漏](<../AI 工具/AI Agent/AI 多模型協作審碼抓漏.md>)
 **情境 B**：[[Claude Code 自動開發15訣]] + [[drift_ai]] + [[ralph-loop]]
 **情境 C**：[[MCP 工具]] + [[kinggyusuh-gemini-search-cc]] + [[提示詞技巧]]
 **情境 D**：[[obra-superpowers]] + [[agent-skills]] + [[everything-claude-code 冠軍配置]]
@@ -20,8 +20,8 @@ status: wiki
 | 頁面 | 適用場景 | 搭配建議 |
 |------|----------|----------|
 | [[工作流與配置]] | 先理解 Agent 權限模式、完成定義與自動化觸發 | 作為所有協作流程的底座，再接 [[Claude 高手用法設定即執行]] |
-| [[Claude 高手用法設定即執行]] | 想快速掌握 Skills / Subagents / Hooks 如何分工 | 讀完可直接接 [[AI 多模型協作審碼抓漏]] 看角色分派 |
-| [[AI 多模型協作審碼抓漏]] | 想了解 Claude / Codex / Gemini 的典型分工方式 | 可與 [[提示詞技巧]] 一起看共識審碼做法 |
+| [[Claude 高手用法設定即執行]] | 想快速掌握 Skills / Subagents / Hooks 如何分工 | 讀完可直接接 [AI 多模型協作審碼抓漏](<../AI 工具/AI Agent/AI 多模型協作審碼抓漏.md>) 看角色分派 |
+| [AI 多模型協作審碼抓漏](<../AI 工具/AI Agent/AI 多模型協作審碼抓漏.md>) | 想了解 Claude / Codex / Gemini 的典型分工方式 | 可與 [[提示詞技巧]] 一起看共識審碼做法 |
 
 ## 進階配置
 
@@ -37,7 +37,7 @@ status: wiki
 |------|----------|----------|
 | [[drift_ai]] | 常在 Claude Code、Codex、Cursor 等 agent 間切換任務 | 適合作為跨 Agent handoff 與脈絡保存層 |
 | [[Claude Code 脆文實作50招]] | 想快速掃描多 Agent、工具整合與 workflow 技巧清單 | 可作為主題導航，再回跳各專頁深挖 |
-| [[提示詞技巧]] | 想用多模型共識、分角色提示詞提升審碼與分析穩定度 | 與 [[AI 多模型協作審碼抓漏]] 搭配最完整 |
+| [[提示詞技巧]] | 想用多模型共識、分角色提示詞提升審碼與分析穩定度 | 與 [AI 多模型協作審碼抓漏](<../AI 工具/AI Agent/AI 多模型協作審碼抓漏.md>) 搭配最完整 |
 
 ## 參考實作
 
