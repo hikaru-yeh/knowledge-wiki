@@ -54,18 +54,18 @@ duplicates
 canonical-guard
 author-fix
 bare-link-fix
+pending-match
+promote-ready
+audit-list
 ```
 
 ### 尚未完成
 
-- `pending-match`
 - `inject-pending`
-- `promote-ready`
-- `audit-list`
+- `promote-ready --apply`
 - safe apply flows for promote / ingest / index repair
 - canonical cleanup automation
 - delegate integration
-- Claude Code hook：工具開發或重要掃描後，應由 hook 提醒/阻擋忘記更新 `tasks/current-handoff.md`；若 subcommand 行為改變，hook 應提醒同步更新本 implementation plan。
 - CI/report cleanliness gates
 - 完整 README/tool docs for future apply commands
 
@@ -76,13 +76,15 @@ bare-link-fix
 1. ~~`author-fix --apply`~~ ✅ 已完成（2026-05-27，commit `822fd3f`）
 2. ~~OCR garble prevention~~ ✅ 已完成（2026-05-28，commit `bf2efa9`）
 3. ~~Ambiguous bare link bulk fix~~ ✅ 已完成（2026-05-28，commit `bf2efa9`，353/355 fixed）
-4. `pending-match`
-5. `promote-ready` dry-run/report-only
-6. `audit-list`
+4. ~~`pending-match`~~ ✅ 已完成（2026-05-28，commit `650e21c`，report-only，tested with 0 pending files）
+5. ~~`promote-ready` dry-run/report-only~~ ✅ 已完成（2026-05-28，commit `650e21c`，9 stubs ready）
+6. ~~`audit-list`~~ ✅ 已完成（2026-05-28，commit `650e21c`）
 7. ~~Claude Code maintenance hook~~ ✅ 已完成（handoff / implementation-plan reminder）
 8. 再評估 `inject-pending --dry-run`
-9. LingOrm content dedup（`Lingorm 群組八卦懶人包` 存在於兩個子目錄）
-10. BOM frontmatter fix（`AI Agent 架構四象限.md` 前有 BOM 導致 YAML parser 失敗）
+9. ~~LingOrm content dedup~~ ✅ 已完成（2026-05-28，commit `650e21c`，deleted LingOrm 系列 duplicate，kept 鄺玲玲系列）
+10. ~~BOM frontmatter fix~~ ✅ 已完成（2026-05-28，commit `650e21c`，3 parsers patched + file BOM stripped）
+11. `promote-ready --apply`（9 stubs ready，需 review 後批次 promote）
+12. Playwright auth cookie injection（2 求職履歷 stubs blocked by login wall）
 
 `inject-pending --apply`、`promote-ready --apply`、index repair apply 都應等 report-only 層穩定且被人工 review 後再做。
 

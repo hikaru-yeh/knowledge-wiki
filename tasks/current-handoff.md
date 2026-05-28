@@ -1,8 +1,8 @@
 # Current Handoff
 
-- Generated: 2026-05-28 (batch 2)
-- Task: batch wiki maintenance — bare links, stubs, OCR, indexes, tooling
-- Next: pending-match, promote-ready dry-run, audit-list
+- Generated: 2026-05-28 (batch 3)
+- Task: new subcommands, BOM defense, LingOrm dedup, Playwright fill attempt
+- Next: promote 9 ready stubs, safe apply flows
 - Current branch during this update: `master`
 
 ## Current State Summary
@@ -22,6 +22,9 @@ Available subcommands in `tools/wiki_maintain.py`:
 - `canonical-guard` — detect stale canonical conflicts and author frontmatter rule violations
 - `author-fix` — repair bare-string `作者` fields into canonical list format
 - `bare-link-fix` — convert ambiguous bare `[[wikilinks]]` to explicit relative links in index files
+- `pending-match` — compare external pending digest URLs against wiki page URLs
+- `promote-ready` — list non-LingOrm stub pages with substantial content (report-only)
+- `audit-list` — list open items from the audit/ directory
 
 ## Claude Code / Worker Completed Tasks Captured
 
@@ -51,6 +54,14 @@ These were reported complete in this session and are now reflected in this hando
 - 總索引 dashboard counts updated (Wiki 359, Stub 95)
 - All index files updated: AI 工具-索引, 健康生活-索引, 生活雜記-索引, 求職履歷-索引
 - Commit `bf2efa9`: batch wiki maintenance (20 files, +978/-16916 lines)
+- `pending-match` subcommand implemented: report-only, requires `--pending-dir`, tested with crawl-the-threads output (0 pending files)
+- `promote-ready` subcommand implemented: report-only, found 9 stubs ready for promotion (7 AI 工具 body>198 chars, 2 求職履歷 borderline at 32 chars with 2 headings)
+- `audit-list` subcommand implemented: reports "no audit directory" (expected)
+- BOM defense: `text.lstrip('﻿')` added to `parse_frontmatter()` in wiki_maintain.py, fill_threads_stub_pages.py, inject_pending_digest.py
+- BOM stripped from `AI Agent 架構四象限.md` file content; status-audit missing-status reduced from 2→1 (only session-筆記-索引.md remains, genuinely missing frontmatter)
+- LingOrm dedup resolved: deleted `LingOrm 系列/Lingorm 群組八卦懶人包.md` (truncated URL), kept `鄺玲玲系列/` version (full URL matching raw source), index link disambiguated
+- Playwright fill for 2 求職履歷 stubs (`有用免費證照.md`, `職涯分析Prompt.md`): FAILED — SocialCrawl API 404 + Threads login wall. Pages remain as stubs.
+- Commit `650e21c`: feat(tools) batch 3 (7 files, +632/-12 lines)
 - public showcase scaffold/documentation updates on `codex/public-showcase`
 - public `AGENTS.md` sync from private `CLAUDE.md`
 - public `AGENTS_en.md` English companion and sync rule
@@ -144,20 +155,18 @@ Still not completed:
 - CI/report cleanliness gates
 - README/tool docs for any future apply commands
 
-### Known pre-existing issues (not introduced by this batch)
+### Known remaining issues
 
-- 2 pages with missing `status` frontmatter: `AI Agent 架構四象限.md` (BOM-encoded frontmatter blocks YAML parser), `session-筆記-索引.md` (no frontmatter at all)
-- 1 genuinely ambiguous bare link: `Lingorm 群組八卦懶人包` exists in two LingOrm subdirs — needs content dedup decision
-- 2 求職履歷 stubs (`有用免費證照.md`, `職涯分析Prompt.md`) remain unfetchable via WebFetch — Threads URLs require login, need playwright-based `fill_threads_stub_pages.py` for these
+- 1 page with missing `status` frontmatter: `session-筆記-索引.md` (index page with no frontmatter — intentional, not a content page)
+- 2 求職履歷 stubs (`有用免費證照.md`, `職涯分析Prompt.md`) remain unfetchable — Threads login wall blocks both SocialCrawl API and Playwright. Needs logged-in session cookie or manual content.
 
 ## Explicit Next Step
 
-OCR garble prevention and ambiguous bare links are now resolved. Next priorities:
+All report-only subcommands are complete. Next priorities:
 
-1. **Report-only tool layer** — `pending-match`, `promote-ready` dry-run, `audit-list`.
-2. **LingOrm content dedup** — resolve `Lingorm 群組八卦懶人包` duplicate (exists in two subdirs).
-3. **BOM frontmatter fix** — strip BOM from `AI Agent 架構四象限.md` so YAML parser works.
-4. **Playwright stub fill** — use `fill_threads_stub_pages.py` for the 2 unfetchable 求職履歷 stubs.
+1. **Promote 9 ready stubs** — `promote-ready` found 9 pages with substantial content. Review findings and batch promote (7 AI 工具 are solid, 2 求職履歷 are borderline). Consider implementing `promote-ready --apply`.
+2. **Safe apply flows** — implement `promote-ready --apply` and `inject-pending --apply` with `--dry-run` default.
+3. **Playwright auth** — inject Threads session cookie into `fill_threads_stub_pages.py` for the 2 blocked 求職履歷 stubs.
 
 Do not begin `inject-pending --apply` or `promote-ready --apply` until the dry-run/report layer has been reviewed.
 
