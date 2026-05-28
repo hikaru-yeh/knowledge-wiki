@@ -2759,6 +2759,332 @@ def command_pending_match(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# inject-pending: inject content from pending digest files into stub wiki pages
+# ---------------------------------------------------------------------------
+
+_INJECT_STUB_MARKERS = [
+    "## Main Content\n\n（📌 待消化）",
+    "## Main Content\n（📌 待消化）",
+]
+
+_INJECT_LEVEL2_RE = re.compile(
+    r"```|❶|❷|❸|❹|❺|步驟\s*[：:]|Step\s+\d|第[一二三四五六七八九十]+步"
+    r"|^\d+\.\s|^[•▪▸]\s.*(?:指令|設定|安裝|執行)|如何[^嗎]|怎麼做"
+    r"|(?:N|[0-9]+)\s*個(?:方法|技巧|步驟|招|指令)",
+    re.MULTILINE,
+)
+
+
+def _determine_inject_status(body: str) -> str:
+    """Return 'wiki' if body is Level 2 (has code/steps/commands), else 'stub'."""
+    if _INJECT_LEVEL2_RE.search(body):
+        return "wiki"
+    if body.count("\n---\n") >= 2 and len(body) > 300:
+        return "wiki"
+    return "stub"
+
+
+@dataclass(frozen=True)
+class InjectPendingEntry:
+    pending: PendingRecord
+    wiki_page: PageRecord
+    pending_body: str       # body extracted from pending file (after frontmatter)
+    new_status: str         # "wiki" or "stub"
+
+
+@dataclass(frozen=True)
+class InjectPendingResult:
+    eligible: list[InjectPendingEntry]                              # stub marker found, ready to inject
+    already_filled: list[tuple[PendingRecord, PageRecord]]          # matched but no stub marker
+    lingorm_skipped: list[tuple[PendingRecord, PageRecord]]         # LingOrm pages always skipped
+    no_match: list[PendingRecord]                                   # pending url not in wiki
+    duplicate_match: list[tuple[PendingRecord, list[PageRecord]]]   # ambiguous
+    pending_missing_url: list[PendingRecord]                        # pending has no url
+
+
+def collect_inject_pending(pending_dir: Path, root: Path, wiki_dir: Path) -> InjectPendingResult:
+    """Build a report of which pending files would be injected into wiki stubs."""
+    pending_records = load_pending_records(pending_dir)
+    wiki_pages = load_wiki_pages(root, wiki_dir)
+
+    wiki_by_url: dict[str, list[PageRecord]] = {}
+    for page in wiki_pages:
+        if page.url:
+            wiki_by_url.setdefault(page.url, []).append(page)
+
+    eligible: list[InjectPendingEntry] = []
+    already_filled: list[tuple[PendingRecord, PageRecord]] = []
+    lingorm_skipped: list[tuple[PendingRecord, PageRecord]] = []
+    no_match: list[PendingRecord] = []
+    duplicate_match: list[tuple[PendingRecord, list[PageRecord]]] = []
+    pending_missing_url: list[PendingRecord] = []
+
+    for record in pending_records:
+        if not record.url:
+            pending_missing_url.append(record)
+            continue
+        wiki_hits = wiki_by_url.get(record.url, [])
+        if len(wiki_hits) == 0:
+            no_match.append(record)
+        elif len(wiki_hits) > 1:
+            duplicate_match.append((record, wiki_hits))
+        else:
+            wiki_page = wiki_hits[0]
+            # Skip LingOrm
+            if "LingOrm" in wiki_page.category or "LingOrm" in wiki_page.wiki_rel_path:
+                lingorm_skipped.append((record, wiki_page))
+                continue
+            # Read wiki file to check for stub marker
+            wiki_abs_path = root / wiki_page.rel_path
+            try:
+                wiki_text = read_text(wiki_abs_path)
+            except Exception:
+                no_match.append(record)
+                continue
+            has_stub = any(marker in wiki_text for marker in _INJECT_STUB_MARKERS)
+            if not has_stub:
+                already_filled.append((record, wiki_page))
+                continue
+            # Read pending body
+            pending_text = read_text(record.path)
+            _fm, pending_body = parse_frontmatter(pending_text)
+            new_status = _determine_inject_status(pending_body)
+            eligible.append(InjectPendingEntry(
+                pending=record,
+                wiki_page=wiki_page,
+                pending_body=pending_body,
+                new_status=new_status,
+            ))
+
+    return InjectPendingResult(
+        eligible=eligible,
+        already_filled=already_filled,
+        lingorm_skipped=lingorm_skipped,
+        no_match=no_match,
+        duplicate_match=duplicate_match,
+        pending_missing_url=pending_missing_url,
+    )
+
+
+def render_inject_pending_report(result: InjectPendingResult, report_date: str, pending_dir: Path) -> str:
+    lines = [
+        f"# Inject Pending Report - {report_date}",
+        "",
+        f"Pending directory: `{pending_dir.as_posix()}`",
+        "",
+        "## Summary",
+        "",
+        f"- Eligible for injection: {len(result.eligible)}",
+        f"- Already filled (no stub marker): {len(result.already_filled)}",
+        f"- LingOrm skipped: {len(result.lingorm_skipped)}",
+        f"- No wiki match: {len(result.no_match)}",
+        f"- Duplicate wiki match: {len(result.duplicate_match)}",
+        f"- Pending missing URL: {len(result.pending_missing_url)}",
+        "",
+        "## Eligible for Injection",
+        "",
+    ]
+    if result.eligible:
+        lines.extend(["| Pending File | Wiki Page | New Status |", "|---|---|---|"])
+        for entry in result.eligible:
+            lines.append(
+                f"| `{markdown_cell(entry.pending.rel_path)}` "
+                f"| `{markdown_cell(entry.wiki_page.rel_path)}` "
+                f"| {entry.new_status} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Already Filled", ""])
+    if result.already_filled:
+        lines.extend(["| Pending File | Wiki Page |", "|---|---|"])
+        for pending, page in result.already_filled:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | `{markdown_cell(page.rel_path)}` |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## LingOrm Skipped", ""])
+    if result.lingorm_skipped:
+        lines.extend(["| Pending File | Wiki Page |", "|---|---|"])
+        for pending, page in result.lingorm_skipped:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | `{markdown_cell(page.rel_path)}` |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## No Wiki Match", ""])
+    if result.no_match:
+        lines.extend(["| Pending File | URL |", "|---|---|"])
+        for pending in result.no_match:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | {markdown_cell(pending.url)} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Duplicate Wiki Match", ""])
+    if result.duplicate_match:
+        lines.extend(["| Pending File | URL | Wiki Pages |", "|---|---|---|"])
+        for pending, pages in result.duplicate_match:
+            wiki_list = ", ".join(f"`{markdown_cell(p.rel_path)}`" for p in pages)
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | {markdown_cell(pending.url)} | {wiki_list} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Pending Missing URL", ""])
+    if result.pending_missing_url:
+        lines.extend(["| Pending File |", "|---|"])
+        for pending in result.pending_missing_url:
+            lines.append(f"| `{markdown_cell(pending.rel_path)}` |")
+    else:
+        lines.append("None.")
+
+    return "\n".join(lines)
+
+
+def unique_inject_pending_report_path(report_dir: Path, report_date: str) -> Path:
+    first_path = report_dir / f"inject-pending-{report_date}.md"
+    if not first_path.exists():
+        return first_path
+    for index in range(2, 1000):
+        path = report_dir / f"inject-pending-{report_date}-{index}.md"
+        if not path.exists():
+            return path
+    raise RuntimeError(f"too many inject-pending reports already exist for {report_date}")
+
+
+def apply_inject_pending(
+    entries: list[InjectPendingEntry],
+    root: Path,
+    limit: int | None = None,
+    dry_run: bool = False,
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Inject content from pending files into matching wiki stubs.
+
+    Returns (injected_paths, errors) where injected_paths are repo-relative
+    paths (forward-slash) and errors are (path, message) pairs.
+    """
+    to_inject = entries[:limit] if limit is not None else entries
+    injected: list[str] = []
+    errors: list[tuple[str, str]] = []
+
+    for entry in to_inject:
+        wiki_path = root / entry.wiki_page.rel_path
+        # Safety: skip LingOrm
+        if "LingOrm" in entry.wiki_page.category or "LingOrm" in entry.wiki_page.wiki_rel_path:
+            errors.append((entry.wiki_page.rel_path, "LingOrm page — always skipped"))
+            continue
+        try:
+            wiki_text = read_text(wiki_path)
+        except Exception as exc:
+            errors.append((entry.wiki_page.rel_path, f"read error: {exc}"))
+            continue
+
+        # Replace stub marker
+        new_text = wiki_text
+        replaced = False
+        for marker in _INJECT_STUB_MARKERS:
+            if marker in new_text:
+                new_text = new_text.replace(marker, f"## Main Content\n\n{entry.pending_body}", 1)
+                replaced = True
+                break
+        if not replaced:
+            errors.append((entry.wiki_page.rel_path, "stub marker no longer present — already filled?"))
+            continue
+
+        # Update status field in frontmatter
+        new_text = re.sub(r"(status:\s*)stub", rf"\g<1>{entry.new_status}", new_text, count=1)
+
+        if not dry_run:
+            write_text(wiki_path, new_text)
+
+        injected.append(normalize_rel_path(wiki_path, root))
+
+    return injected, errors
+
+
+def command_inject_pending(args: argparse.Namespace) -> int:
+    if not args.pending_dir:
+        print("error: --pending-dir is required for inject-pending", file=sys.stderr)
+        return 1
+    pending_dir = Path(args.pending_dir).resolve()
+    if not pending_dir.exists():
+        print(f"error: pending directory does not exist: {args.pending_dir}", file=sys.stderr)
+        return 1
+    if not pending_dir.is_dir():
+        print(f"error: pending-dir is not a directory: {args.pending_dir}", file=sys.stderr)
+        return 1
+
+    root = args.root.resolve()
+    wiki_dir = Path(args.wiki_dir)
+    result = collect_inject_pending(pending_dir, root, wiki_dir)
+
+    apply_mode: bool = getattr(args, "apply", False)
+    limit: int | None = getattr(args, "limit", None)
+
+    print("inject-pending")
+    print(f"pending directory: {pending_dir.as_posix()}")
+    print(f"eligible for injection: {len(result.eligible)}")
+    for i, entry in enumerate(result.eligible[:30]):
+        print(f"  {entry.pending.rel_path} → {entry.wiki_page.rel_path} [{entry.new_status}]")
+    if len(result.eligible) > 30:
+        print(f"  ... and {len(result.eligible) - 30} more")
+    print(f"already filled: {len(result.already_filled)}")
+    print(f"LingOrm skipped: {len(result.lingorm_skipped)}")
+    print(f"no wiki match: {len(result.no_match)}")
+    print(f"duplicate match: {len(result.duplicate_match)}")
+    print(f"pending missing url: {len(result.pending_missing_url)}")
+
+    if apply_mode:
+        injected, errors = apply_inject_pending(
+            result.eligible, root, limit=limit, dry_run=False
+        )
+        print(f"\nInjected {len(injected)} pages.")
+        for path in injected:
+            print(f"  {path}")
+        if errors:
+            print(f"\nSkipped/errors ({len(errors)}):")
+            for path, msg in errors:
+                print(f"  {path}: {msg}")
+
+        if injected:
+            log_path = root / wiki_dir / "log.md"
+            today = date.today().isoformat()
+            log_entry = (
+                f"\n## [{today}] inject-pending | {len(injected)} pages injected by inject-pending --apply\n"
+            )
+            existing = read_text(log_path) if log_path.exists() else ""
+            write_text(log_path, existing.rstrip() + log_entry)
+            print(f"\nAppended log entry to {normalize_rel_path(log_path, root)}")
+            print(
+                f"\nReminder: Dashboard in 總索引.md needs manual update "
+                f"for any pages promoted to wiki."
+            )
+    else:
+        if result.eligible:
+            print("\nUse --apply to inject content into these stubs.")
+            print("Use --apply --limit N to cap batch size.")
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
+            report_path = unique_inject_pending_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            write_text(report_path, render_inject_pending_report(result, report_date, pending_dir))
+            print(f"\nReport written: {normalize_rel_path(report_path, root)}")
+        except RuntimeError as exc:
+            print(f"warning: {exc}", file=sys.stderr)
+
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # promote-ready: find non-LingOrm stubs with substantial content
 # ---------------------------------------------------------------------------
 
@@ -3251,6 +3577,31 @@ def build_parser() -> argparse.ArgumentParser:
     pending_match.add_argument("--report", action="store_true", help="Write a dated pending-match Markdown report.")
     pending_match.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
     pending_match.set_defaults(func=command_pending_match)
+
+    inject_pending = subparsers.add_parser(
+        "inject-pending",
+        help="Inject content from pending digest files into matching wiki stubs.",
+    )
+    inject_pending.add_argument(
+        "--pending-dir",
+        metavar="PATH",
+        help="Directory containing pending digest output .md files.",
+    )
+    inject_pending.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually inject content (replace stub markers, update status).",
+    )
+    inject_pending.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cap the number of pages injected when --apply is given (default: no limit).",
+    )
+    inject_pending.add_argument("--report", action="store_true", help="Write a dated inject-pending Markdown report.")
+    inject_pending.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    inject_pending.set_defaults(func=command_inject_pending)
 
     promote_ready = subparsers.add_parser(
         "promote-ready",
