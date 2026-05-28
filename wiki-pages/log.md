@@ -365,6 +365,13 @@ Batch D2 最後 3 頁全部從 `status: wiki` 降回 `status: stub`：`AI-員工
 - 91 個有實際內容的檔案整理為 wiki 頁面
 - 結構參照 `ai-tips & notes\wiki\` 現有分類
 
+## [2026-05-28] reorganization + ingest | Thariq-在-X → Claude-Code-Session-Management-1M-Context
+
+- 移動：求職履歷/Thariq-在-X.md（stub）→ AI 工具/Claude-Code/Claude-Code-Session-Management-1M-Context.md（wiki）
+- 來源：https://claude.com/blog/using-claude-code-session-management-and-1m-context (Thariq Shihipar, Anthropic)
+- 內容：5種 session 操作決策表（Continue/rewind/clear/compact/Subagents）、context rot 原理、compact vs clear 比較、subagent 使用時機
+- 更新索引：求職履歷-索引（移除）、AI 工具-索引 Token 與上下文（新增）、總索引 dashboard
+
 ## [2026-05-28] update | session-筆記-索引.md frontmatter fix + coverage exclusion list additions
 
 - session-筆記-索引.md：補 `status: wiki` frontmatter，清除 CI gate error=1

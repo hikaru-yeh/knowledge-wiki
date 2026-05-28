@@ -85,6 +85,7 @@ status: wiki
 | 文件 | 重點 |
 |------|------|
 | [[Token 優化]] | 四步省 94%（198k→10k）、Caveman Skill 省 75%、bu-ketao 省 72% |
+| [Claude-Code-Session-Management-1M-Context](<../AI 工具/Claude-Code/Claude-Code-Session-Management-1M-Context.md>) | Continue/rewind/clear/compact/Subagents 五操作決策表，context rot 原理，何時開新 session |
 | [[Claude ADHD 模式七個高效指令]] | Brain Dump、Task Untangler、Hyperfocus Hijacker、Body Double Bot 等 7 個指令 |
 | [[Claude 高手用法設定即執行]] | CLAUDE.md + Skills + Subagents + Hooks 四大進階功能 |
 | [[Claude Code：用 NotebookLM 讓 Claude 不再重複讀取 PDF]] | NotebookLM MCP 避免 Claude Code 重複讀 PDF 浪費 token |
