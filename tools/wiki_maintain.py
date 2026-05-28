@@ -2897,11 +2897,119 @@ def render_promote_ready_report(result: PromoteReadyResult, report_date: str) ->
     if result.ready:
         lines.extend([
             "",
-            "> Note: `--apply` is not implemented for this subcommand.",
-            "> Review the list above and promote pages manually or via a future apply command.",
+            "> Use `--apply` to promote these pages (changes `status: stub` → `status: wiki` and removes stub markers from index files).",
+            "> Use `--apply --limit N` to cap the number of pages promoted.",
         ])
 
     return "\n".join(lines)
+
+
+# Regex: matches [[stem]] or [[stem|alias]] followed by the stub marker.
+# Also matches [stem](<../path>) style relative links.
+_STUB_MARKER_WIKILINK_RE_TEMPLATE = r'(\[\[{stem}[^\]]*\]\])\s*（📌 stub）'
+_STUB_MARKER_RELLINK_RE_TEMPLATE = r'(\[{stem}\]\(<[^>]*>\))\s*（📌 stub）'
+
+
+def _build_stub_marker_patterns(stem: str) -> list[re.Pattern[str]]:
+    escaped = re.escape(stem)
+    return [
+        re.compile(_STUB_MARKER_WIKILINK_RE_TEMPLATE.format(stem=escaped)),
+        re.compile(_STUB_MARKER_RELLINK_RE_TEMPLATE.format(stem=escaped)),
+    ]
+
+
+def _remove_stub_marker_from_index_files(
+    wiki_dir: Path, stem: str, dry_run: bool = False
+) -> list[Path]:
+    """Strip （📌 stub） from all index files that reference *stem*.
+
+    Returns list of index files modified (or that would be modified in dry-run).
+    """
+    index_dir = wiki_dir / "index"
+    if not index_dir.is_dir():
+        return []
+
+    patterns = _build_stub_marker_patterns(stem)
+    modified: list[Path] = []
+
+    for index_path in sorted(index_dir.glob("*.md")):
+        text = read_text(index_path)
+        new_text = text
+        for pattern in patterns:
+            new_text = pattern.sub(r'\1', new_text)
+        if new_text != text:
+            if not dry_run:
+                write_text(index_path, new_text)
+            modified.append(index_path)
+
+    return modified
+
+
+def _promote_stub_to_wiki(page_path: Path, dry_run: bool = False) -> bool:
+    """Change `status: stub` → `status: wiki` in *page_path* frontmatter.
+
+    Returns True if the file was (or would be) changed.
+    Raises ValueError if the file does not have `status: stub`.
+    """
+    text = read_text(page_path)
+    # Match status line in frontmatter — look for `status: stub` (with optional quotes)
+    status_re = re.compile(
+        r'^(status:\s*)([\'"]?)stub([\'"]?\s*)$',
+        re.MULTILINE | re.IGNORECASE,
+    )
+    match = status_re.search(text)
+    if not match:
+        raise ValueError(f"no 'status: stub' found in frontmatter of {page_path}")
+
+    new_text = status_re.sub(r'\1\2wiki\3', text, count=1)
+    if new_text == text:
+        return False
+    if not dry_run:
+        write_text(page_path, new_text)
+    return True
+
+
+def apply_promote_ready(
+    entries: list[PromoteReadyEntry],
+    root: Path,
+    wiki_dir: Path,
+    limit: int | None,
+    dry_run: bool = False,
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Promote up to *limit* stub pages to wiki status.
+
+    Returns (promoted_paths, errors) where promoted_paths are repo-relative
+    paths (forward-slash) and errors are (path, message) pairs.
+    """
+    to_promote = entries[:limit] if limit is not None else list(entries)
+    promoted: list[str] = []
+    errors: list[tuple[str, str]] = []
+
+    wiki_abs = (root / wiki_dir).resolve()
+
+    for entry in to_promote:
+        page = entry.page
+        # Safety: skip if not actually stub (race or stale data)
+        if normalize_status(page.status) != "stub":
+            errors.append((page.rel_path, "status is not stub — skipped"))
+            continue
+        # Safety: skip LingOrm
+        if "LingOrm" in page.wiki_rel_path or "LingOrm" in page.category:
+            errors.append((page.rel_path, "LingOrm page — always skipped"))
+            continue
+
+        page_path = root / page.rel_path
+        try:
+            changed = _promote_stub_to_wiki(page_path, dry_run=dry_run)
+        except Exception as exc:
+            errors.append((page.rel_path, str(exc)))
+            continue
+
+        if changed:
+            _remove_stub_marker_from_index_files(wiki_abs, page.stem, dry_run=dry_run)
+            promoted.append(page.rel_path)
+
+    return promoted, errors
 
 
 def unique_promote_ready_report_path(report_dir: Path, report_date: str) -> Path:
@@ -2917,7 +3025,11 @@ def unique_promote_ready_report_path(report_dir: Path, report_date: str) -> Path
 
 def command_promote_ready(args: argparse.Namespace) -> int:
     root = args.root.resolve()
-    result = collect_promote_ready(root, Path(args.wiki_dir))
+    wiki_dir = Path(args.wiki_dir)
+    result = collect_promote_ready(root, wiki_dir)
+
+    apply_mode: bool = getattr(args, "apply", False)
+    limit: int | None = getattr(args, "limit", None)
 
     print("promote-ready")
     print(f"ready to promote: {len(result.ready)}")
@@ -2926,6 +3038,35 @@ def command_promote_ready(args: argparse.Namespace) -> int:
     if len(result.ready) > 30:
         print(f"  ... and {len(result.ready) - 30} more")
     print(f"blocked (empty/url-only): {len(result.blocked)}")
+
+    if apply_mode:
+        wiki_abs = (root / wiki_dir).resolve()
+        promoted, errors = apply_promote_ready(
+            result.ready, root, wiki_abs, limit=limit, dry_run=False
+        )
+        print(f"\nPromoted {len(promoted)} pages.")
+        for path in promoted:
+            print(f"  {path}")
+        if errors:
+            print(f"\nSkipped/errors ({len(errors)}):")
+            for path, msg in errors:
+                print(f"  {path}: {msg}")
+
+        if promoted:
+            # Append to log
+            log_path = root / wiki_dir / "log.md"
+            today = date.today().isoformat()
+            log_entry = (
+                f"\n## [{today}] promote | {len(promoted)} pages promoted by promote-ready --apply\n"
+            )
+            existing = read_text(log_path) if log_path.exists() else ""
+            write_text(log_path, existing.rstrip() + log_entry)
+            print(f"\nAppended log entry to {normalize_rel_path(log_path, root)}")
+
+            print(
+                f"\nReminder: Dashboard in 總索引.md needs manual update "
+                f"(+{len(promoted)} wiki, -{len(promoted)} stub for affected category)."
+            )
 
     if args.report:
         report_date = args.date or date.today().isoformat()
@@ -3112,10 +3253,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     promote_ready = subparsers.add_parser(
         "promote-ready",
-        help="List non-LingOrm stub pages with substantial content ready for promotion (report-only).",
+        help="List non-LingOrm stub pages with substantial content ready for promotion.",
     )
     promote_ready.add_argument("--report", action="store_true", help="Write a dated promote-ready Markdown report.")
     promote_ready.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    promote_ready.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually promote pages (change status: stub → wiki, strip stub markers from indexes).",
+    )
+    promote_ready.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cap the number of pages promoted when --apply is given (default: no limit).",
+    )
     promote_ready.set_defaults(func=command_promote_ready)
 
     audit_list = subparsers.add_parser(

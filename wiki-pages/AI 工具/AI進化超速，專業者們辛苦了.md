@@ -2,7 +2,7 @@
 網址: https://www.threads.com/@zi_yun_yun/post/DXXAV6zk5BG
 作者: ["@zi_yun_yun"]
 tags: []
-status: stub
+status: wiki
 ---
 
 ## Main Content

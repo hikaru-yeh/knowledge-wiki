@@ -2,7 +2,7 @@
 網址: https://www.threads.com/@iiaiuii/post/DXA1s7dCX23
 作者: ["@iiaiuii"]
 tags: []
-status: stub
+status: wiki
 ---
 
 ## Main Content

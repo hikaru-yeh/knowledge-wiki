@@ -155,7 +155,7 @@ status: wiki
 | [90天AI工程師速成：10個GitHub專案](<../AI 工具/90天AI工程師速成：10個GitHub專案.md>) | 90天AI工程師速成：10個GitHub專案 |
 | [AI-Agent-接入-Trello，開啟真實工作流](<../AI 工具/AI-Agent-接入-Trello，開啟真實工作流.md>) | AI Agent 接入 Trello，開啟真實工作流 |
 | [AI-Agent-範本大補帖：100+-即用專案幫你抄作業](<../AI 工具/AI-Agent-範本大補帖：100+-即用專案幫你抄作業.md>) | Awesome LLM Apps：100+ 即用 Agent/RAG 模板，13 分類，Apache-2.0，112k stars |
-| [AI-企業作業系統降臨：一人公司時代來了](<../AI 工具/AI-企業作業系統降臨：一人公司時代來了.md>)（📌 stub） | Agent Stack 行銷貼文，介紹 ADK / MCP / Vertex AI / A2A 四個概念，無程式碼或步驟 |
+| [AI-企業作業系統降臨：一人公司時代來了](<../AI 工具/AI-企業作業系統降臨：一人公司時代來了.md>) | Agent Stack 行銷貼文，介紹 ADK / MCP / Vertex AI / A2A 四個概念，無程式碼或步驟 |
 | [AI-免費課程驚豔登場，付費課程情何以堪](<../AI 工具/AI-免費課程驚豔登場，付費課程情何以堪.md>) | GitHub 免費 AI Engineering 課程，涵蓋 LLM、RAG、Agent 與實作專案，適合自學補底層 |
 | [AI-員工速成：Claude-+-Obsidian-密技大公開](<../AI 工具/AI-員工速成：Claude-+-Obsidian-密技大公開.md>)（📌 stub） | Claude + Obsidian playbook 一句 teaser，外部連結未 ingest |
 | [AI-影分身：Meta-Meta-Prompting-打造個人大腦](<../AI 工具/AI-影分身：Meta-Meta-Prompting-打造個人大腦.md>) | AI 影分身：Meta Meta Prompting 打造個人大腦 |
@@ -167,7 +167,7 @@ status: wiki
 | [AI寫文口頭禪](<../AI 工具/AI寫文口頭禪.md>)（📌 stub） | AI寫文口頭禪 |
 | [AI專家員工庫，Github-81萬收藏！](<../AI 工具/AI專家員工庫，Github-81萬收藏！.md>) | AI專家員工庫，Github 81萬收藏！ |
 | [AI流程圖神器：一句話搞定多種風格](<../AI 工具/AI流程圖神器：一句話搞定多種風格.md>) | fireworks-tech-graph：自然語言→SVG+PNG，7 風格、14 種 UML、40+ 技術 icon |
-| [AI進化超速，專業者們辛苦了](<../AI 工具/AI進化超速，專業者們辛苦了.md>)（📌 stub） | AI進化超速，專業者們辛苦了 |
+| [AI進化超速，專業者們辛苦了](<../AI 工具/AI進化超速，專業者們辛苦了.md>) | AI 話題每年換名詞：LLM→RAG→Agent→Harness，追新術語是從業者日常 |
 | [Agent-試錯學習迴路](<../AI 工具/Agent-試錯學習迴路.md>) | Agent 試錯學習迴路 |
 | [Awesome Design System](<../AI 工具/Awesome Design System.md>) | GitHub 20K stars，55個大廠設計系統：Google Material/Apple HIG/Microsoft Fluent/Airbnb/Shopify |
 | [Chandra：文件解析神器，完美保留結構](<../AI 工具/Chandra：文件解析神器，完美保留結構.md>) | Chandra：文件解析神器，完美保留結構 |
@@ -196,10 +196,10 @@ status: wiki
 | [Obsidian-+-Claudian：你的-24-小時-AI-個人秘書](<../AI 工具/Obsidian-+-Claudian：你的-24-小時-AI-個人秘書.md>) | Obsidian + Claudian：你的 24 小時 AI 個人秘書 |
 | [Obsidian-必備神級插件](<../AI 工具/Obsidian-必備神級插件.md>) | Obsidian 必備神級插件 |
 | [PageIndex：RAG-不一定要向量](<../AI 工具/PageIndex：RAG-不一定要向量.md>) | PageIndex：RAG 不一定要向量 |
-| [Paperclip：你的-AI-虛擬公司，預算全自動](<../AI 工具/Paperclip：你的-AI-虛擬公司，預算全自動.md>)（📌 stub） | Paperclip AI 虛擬公司：多 Agent 組織架構 + Auto-Budgeting 自動分配 API 額度 |
+| [Paperclip：你的-AI-虛擬公司，預算全自動](<../AI 工具/Paperclip：你的-AI-虛擬公司，預算全自動.md>) | Paperclip AI 虛擬公司：多 Agent 組織架構 + Auto-Budgeting 自動分配 API 額度 |
 | [Printing-Press：AI-Agent-的-CLI-瑞士刀](<../AI 工具/Printing-Press：AI-Agent-的-CLI-瑞士刀.md>) | Printing Press：AI Agent 的 CLI 瑞士刀 |
 | [Threads-API](<../AI 工具/Threads-API.md>)（📌 stub） | 官方 API 僅限自己帖子；GitHub 開源替代截斷，需 Threads refetch |
-| [Vibe-Coding-亂象與工程師的心累](<../AI 工具/Vibe-Coding-亂象與工程師的心累.md>)（📌 stub） | Vibe Coding 亂象與工程師的心累 |
+| [Vibe-Coding-亂象與工程師的心累](<../AI 工具/Vibe-Coding-亂象與工程師的心累.md>) | Vibe Coding 亂象與工程師的心累 |
 | [guizang-ppt-skill：AI-高質感雜誌風-PPT-神器](<../AI 工具/guizang-ppt-skill：AI-高質感雜誌風-PPT-神器.md>) | 單檔 HTML 簡報技能：Editorial Magazine / Swiss International 兩套風格、32 種版面、WebGL 動畫 |
 | [ralph-loop plugin 原理](<../AI 工具/ralph-loop plugin 原理.md>) | ralph loop plugin 原理 |
 | [vibe-coding-app-資安問題總整理](<../AI 工具/vibe-coding-app-資安問題總整理.md>) | vibe coding app 資安問題總整理 |
@@ -209,13 +209,13 @@ status: wiki
 | [九天打造-Hermes-AI：越用越聰明的個人-AI-Wiki](<../AI 工具/九天打造-Hermes-AI：越用越聰明的個人-AI-Wiki.md>) | Hermes Agent 完整教學：三層 .md 人格配置、Telegram/Gmail/Health 整合、雙 Agent 架構 |
 | [史丹佛-Vibe-Coding：告別感覺寫程式](<../AI 工具/史丹佛-Vibe-Coding：告別感覺寫程式.md>) | 史丹佛 Vibe Coding：告別感覺寫程式 |
 | [實測了上百個skill後，我只留下了這10個skill](<../AI 工具/實測了上百個skill後，我只留下了這10個skill.md>) | 實測了上百個skill後，我只留下了這10個skill |
-| [擺脫糊字！AI簡報組合技](<../AI 工具/擺脫糊字！AI簡報組合技.md>)（📌 stub） | NotebookLM→Nanobanana→LightPDF 三步解決 AI 簡報糊字不能編輯 |
+| [擺脫糊字！AI簡報組合技](<../AI 工具/擺脫糊字！AI簡報組合技.md>) | NotebookLM→Nanobanana→LightPDF 三步解決 AI 簡報糊字不能編輯 |
 | [框架工程：AI優先，重塑你的組織](<../AI 工具/框架工程：AI優先，重塑你的組織.md>) | 框架工程：AI優先，重塑你的組織 |
-| [用Obsidian建立你的LLM知識庫](<../AI 工具/用Obsidian建立你的LLM知識庫.md>)（📌 stub） | Obsidian 搭建 LLM Wiki 教學；作者 PDF 站已改版為 portfolio，無教學內容 |
+| [用Obsidian建立你的LLM知識庫](<../AI 工具/用Obsidian建立你的LLM知識庫.md>) | Obsidian 搭建 LLM Wiki 教學；作者 PDF 站已改版為 portfolio，無教學內容 |
 | [簡報地獄有救！AI免費轉PPT無痛編輯](<../AI 工具/簡報地獄有救！AI免費轉PPT無痛編輯.md>) | 簡報地獄有救！AI免費轉PPT無痛編輯 |
 | [超好看開源日式風格Skill](<../AI 工具/超好看開源日式風格Skill.md>)（📌 stub） | 開源日式風格 Skill，含 agent 設計指南；個人免費、商用需授權 |
 | [部署平台怎麼選？Vercel、Railway、GitHub-Actions-成本與應用場景](<../AI 工具/部署平台怎麼選？Vercel、Railway、GitHub-Actions-成本與應用場景.md>) | 部署平台怎麼選？Vercel、Railway、GitHub Actions 成本與應用場景 |
-| [開發者，別再浪費-tokens](<../AI 工具/開發者，別再浪費-tokens.md>)（📌 stub） | 3 個 GitHub repo（CLI 壓縮 / 結構化 context / prompt 控制）連結全截斷，需 refetch |
+| [開發者，別再浪費-tokens](<../AI 工具/開發者，別再浪費-tokens.md>) | 3 個 GitHub repo（CLI 壓縮 / 結構化 context / prompt 控制）連結全截斷，需 refetch |
 | [Hermes-AI-Agent：會自己進化的懶人助手](<../AI 工具/AI Agent/Hermes-AI-Agent：會自己進化的懶人助手.md>) | Hermes AI Agent：會自己進化的懶人助手 |
 | [Google-Agents-CLI：AI-助手專屬雲端-Agent-開發](<../AI 工具/AI Agent/Google-Agents-CLI：AI-助手專屬雲端-Agent-開發.md>) | Google Agents CLI：AI 助手專屬雲端 Agent 開發 |
 | [AI-Agent-技能生態系成形-2](<../AI 工具/AI Agent/AI-Agent-技能生態系成形-2.md>) | AI Agent 技能生態系成形 2 |
@@ -296,7 +296,7 @@ status: wiki
 | [90天AI工程師速成：10個GitHub專案](<../AI 工具/90天AI工程師速成：10個GitHub專案.md>) | 90天AI工程師速成：10個GitHub專案 |
 | [AI-Agent-接入-Trello，開啟真實工作流](<../AI 工具/AI-Agent-接入-Trello，開啟真實工作流.md>) | AI Agent 接入 Trello，開啟真實工作流 |
 | [AI-Agent-範本大補帖：100+-即用專案幫你抄作業](<../AI 工具/AI-Agent-範本大補帖：100+-即用專案幫你抄作業.md>) | Awesome LLM Apps：100+ 即用 Agent/RAG 模板，13 分類，Apache-2.0，112k stars |
-| [AI-企業作業系統降臨：一人公司時代來了](<../AI 工具/AI-企業作業系統降臨：一人公司時代來了.md>)（📌 stub） | Agent Stack 行銷貼文，介紹 ADK / MCP / Vertex AI / A2A 四個概念，無程式碼或步驟 |
+| [AI-企業作業系統降臨：一人公司時代來了](<../AI 工具/AI-企業作業系統降臨：一人公司時代來了.md>) | Agent Stack 行銷貼文，介紹 ADK / MCP / Vertex AI / A2A 四個概念，無程式碼或步驟 |
 | [AI-免費課程驚豔登場，付費課程情何以堪](<../AI 工具/AI-免費課程驚豔登場，付費課程情何以堪.md>) | GitHub 免費 AI Engineering 課程，涵蓋 LLM、RAG、Agent 與實作專案，適合自學補底層 |
 | [AI-員工速成：Claude-+-Obsidian-密技大公開](<../AI 工具/AI-員工速成：Claude-+-Obsidian-密技大公開.md>)（📌 stub） | Claude + Obsidian playbook 一句 teaser，外部連結未 ingest |
 | [AI-影分身：Meta-Meta-Prompting-打造個人大腦](<../AI 工具/AI-影分身：Meta-Meta-Prompting-打造個人大腦.md>) | AI 影分身：Meta Meta Prompting 打造個人大腦 |
@@ -308,7 +308,7 @@ status: wiki
 | [AI寫文口頭禪](<../AI 工具/AI寫文口頭禪.md>)（📌 stub） | 列出 AI 寫文高頻詞「穩、撐、懂」，幫助識別 AI 腔調具體語言特徵 |
 | [AI專家員工庫，Github-81萬收藏！](<../AI 工具/AI專家員工庫，Github-81萬收藏！.md>) | AI專家員工庫，Github 81萬收藏！ |
 | [AI流程圖神器：一句話搞定多種風格](<../AI 工具/AI流程圖神器：一句話搞定多種風格.md>) | fireworks-tech-graph：自然語言→SVG+PNG，7 風格、14 種 UML、40+ 技術 icon |
-| [AI進化超速，專業者們辛苦了](<../AI 工具/AI進化超速，專業者們辛苦了.md>)（📌 stub） | AI 話題每年換名詞：LLM→RAG→Agent→Harness，追新術語是從業者日常 |
+| [AI進化超速，專業者們辛苦了](<../AI 工具/AI進化超速，專業者們辛苦了.md>) | AI 話題每年換名詞：LLM→RAG→Agent→Harness，追新術語是從業者日常 |
 | [Agent-試錯學習迴路](<../AI 工具/Agent-試錯學習迴路.md>) | hermes-agent 任務後背景 fork review，只存試錯路徑，防止 skill base 膨脹 |
 | [Awesome Design System](<../AI 工具/Awesome Design System.md>) | GitHub 20K stars，55個大廠設計系統：Google Material/Apple HIG/Microsoft Fluent/Airbnb/Shopify |
 | [Chandra：文件解析神器，完美保留結構](<../AI 工具/Chandra：文件解析神器，完美保留結構.md>) | Chandra：文件解析神器，完美保留結構 |
@@ -337,10 +337,10 @@ status: wiki
 | [Obsidian-+-Claudian：你的-24-小時-AI-個人秘書](<../AI 工具/Obsidian-+-Claudian：你的-24-小時-AI-個人秘書.md>) | Obsidian + Claudian：你的 24 小時 AI 個人秘書 |
 | [Obsidian-必備神級插件](<../AI 工具/Obsidian-必備神級插件.md>) | Obsidian 必備神級插件 |
 | [PageIndex：RAG-不一定要向量](<../AI 工具/PageIndex：RAG-不一定要向量.md>) | PageIndex：RAG 不一定要向量 |
-| [Paperclip：你的-AI-虛擬公司，預算全自動](<../AI 工具/Paperclip：你的-AI-虛擬公司，預算全自動.md>)（📌 stub） | Paperclip AI 虛擬公司：多 Agent 組織架構 + Auto-Budgeting 自動分配 API 額度 |
+| [Paperclip：你的-AI-虛擬公司，預算全自動](<../AI 工具/Paperclip：你的-AI-虛擬公司，預算全自動.md>) | Paperclip AI 虛擬公司：多 Agent 組織架構 + Auto-Budgeting 自動分配 API 額度 |
 | [Printing-Press：AI-Agent-的-CLI-瑞士刀](<../AI 工具/Printing-Press：AI-Agent-的-CLI-瑞士刀.md>) | Printing Press：AI Agent 的 CLI 瑞士刀 |
 | [Threads-API](<../AI 工具/Threads-API.md>)（📌 stub） | 官方 API 僅限自己帖子；GitHub 開源替代截斷，需 Threads refetch |
-| [Vibe-Coding-亂象與工程師的心累](<../AI 工具/Vibe-Coding-亂象與工程師的心累.md>)（📌 stub） | Vibe Coding 亂象與工程師的心累 |
+| [Vibe-Coding-亂象與工程師的心累](<../AI 工具/Vibe-Coding-亂象與工程師的心累.md>) | Vibe Coding 亂象與工程師的心累 |
 | [guizang-ppt-skill：AI-高質感雜誌風-PPT-神器](<../AI 工具/guizang-ppt-skill：AI-高質感雜誌風-PPT-神器.md>) | 單檔 HTML 簡報技能：Editorial Magazine / Swiss International 兩套風格、32 種版面、WebGL 動畫 |
 | [ralph-loop plugin 原理](<../AI 工具/ralph-loop plugin 原理.md>) | ralph loop plugin 原理 |
 | [vibe-coding-app-資安問題總整理](<../AI 工具/vibe-coding-app-資安問題總整理.md>) | vibe coding app 資安問題總整理 |
@@ -350,13 +350,13 @@ status: wiki
 | [九天打造-Hermes-AI：越用越聰明的個人-AI-Wiki](<../AI 工具/九天打造-Hermes-AI：越用越聰明的個人-AI-Wiki.md>) | Hermes Agent 完整教學：三層 .md 人格配置、Telegram/Gmail/Health 整合、雙 Agent 架構 |
 | [史丹佛-Vibe-Coding：告別感覺寫程式](<../AI 工具/史丹佛-Vibe-Coding：告別感覺寫程式.md>) | 史丹佛 Vibe Coding：告別感覺寫程式 |
 | [實測了上百個skill後，我只留下了這10個skill](<../AI 工具/實測了上百個skill後，我只留下了這10個skill.md>) | 實測了上百個skill後，我只留下了這10個skill |
-| [擺脫糊字！AI簡報組合技](<../AI 工具/擺脫糊字！AI簡報組合技.md>)（📌 stub） | NotebookLM→Nanobanana→LightPDF 三步解決 AI 簡報糊字不能編輯 |
+| [擺脫糊字！AI簡報組合技](<../AI 工具/擺脫糊字！AI簡報組合技.md>) | NotebookLM→Nanobanana→LightPDF 三步解決 AI 簡報糊字不能編輯 |
 | [框架工程：AI優先，重塑你的組織](<../AI 工具/框架工程：AI優先，重塑你的組織.md>) | 框架工程：AI優先，重塑你的組織 |
-| [用Obsidian建立你的LLM知識庫](<../AI 工具/用Obsidian建立你的LLM知識庫.md>)（📌 stub） | Obsidian 搭建 LLM Wiki 教學；作者 PDF 站已改版為 portfolio，無教學內容 |
+| [用Obsidian建立你的LLM知識庫](<../AI 工具/用Obsidian建立你的LLM知識庫.md>) | Obsidian 搭建 LLM Wiki 教學；作者 PDF 站已改版為 portfolio，無教學內容 |
 | [簡報地獄有救！AI免費轉PPT無痛編輯](<../AI 工具/簡報地獄有救！AI免費轉PPT無痛編輯.md>) | 簡報地獄有救！AI免費轉PPT無痛編輯 |
 | [超好看開源日式風格Skill](<../AI 工具/超好看開源日式風格Skill.md>)（📌 stub） | 開源日式風格 Skill，含 agent 設計指南；個人免費、商用需授權 |
 | [部署平台怎麼選？Vercel、Railway、GitHub-Actions-成本與應用場景](<../AI 工具/部署平台怎麼選？Vercel、Railway、GitHub-Actions-成本與應用場景.md>) | 部署平台怎麼選？Vercel、Railway、GitHub Actions 成本與應用場景 |
-| [開發者，別再浪費-tokens](<../AI 工具/開發者，別再浪費-tokens.md>)（📌 stub） | 3 個 GitHub repo（CLI 壓縮 / 結構化 context / prompt 控制）連結全截斷，需 refetch |
+| [開發者，別再浪費-tokens](<../AI 工具/開發者，別再浪費-tokens.md>) | 3 個 GitHub repo（CLI 壓縮 / 結構化 context / prompt 控制）連結全截斷，需 refetch |
 | [Hermes-AI-Agent：會自己進化的懶人助手](<../AI 工具/AI Agent/Hermes-AI-Agent：會自己進化的懶人助手.md>) | Hermes AI Agent：會自己進化的懶人助手 |
 | [Google-Agents-CLI：AI-助手專屬雲端-Agent-開發](<../AI 工具/AI Agent/Google-Agents-CLI：AI-助手專屬雲端-Agent-開發.md>) | Google Agents CLI：AI 助手專屬雲端 Agent 開發 |
 | [AI-Agent-技能生態系成形-2](<../AI 工具/AI Agent/AI-Agent-技能生態系成形-2.md>) | AI Agent 技能生態系成形 2 |

@@ -2,7 +2,7 @@
 網址: https://www.threads.com/@kenchankw/post/DX62UivEUTE
 作者: ["@kenchankw"]
 tags: []
-status: stub
+status: wiki
 ---
 
 ## Main Content

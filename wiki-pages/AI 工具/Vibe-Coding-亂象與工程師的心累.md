@@ -2,7 +2,7 @@
 網址: https://www.threads.com/@yiyi2310/post/DX5-ovKD-Xx
 作者: ["@yiyi2310"]
 tags: []
-status: stub
+status: wiki
 ---
 
 ## Main Content

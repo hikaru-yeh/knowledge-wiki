@@ -4,6 +4,10 @@ status: wiki
 
 # Wiki 操作日誌
 
+## [2026-05-28] promote | 7 AI 工具 stubs batch promoted | stub→wiki
+
+Pages: AI-企業作業系統降臨：一人公司時代來了、AI進化超速，專業者們辛苦了、Paperclip：你的-AI-虛擬公司，預算全自動、Vibe-Coding-亂象與工程師的心累、擺脫糊字！AI簡報組合技、用Obsidian建立你的LLM知識庫、開發者，別再浪費-tokens。總索引儀表板 AI 工具 Wiki 209→216，Stub 12→5。
+
 ## [2026-05-28] ingest | 工程師最常用的 12 個 Claude Code 指令 | status: wiki
 
 來源：raw/threads-iphone/threads-unknown-20260511-120328.md 與 threads-unknown-20260511-120523.md（兩個 raw 檔指向同一 URL）。WebFetch 成功抓取部分內容：帖文可見文字、互動數據、主題確認（12 個 Claude Code 指令快捷鍵）；速查表以圖片呈現無法抽取文字。合併成一頁 wiki，存於 wiki-pages/AI 工具/Claude-Code/工程師最常用的 12 個 Claude Code 指令.md，作者 @this.web，Level 2（含指令/速查表），status: wiki。AI 工具-索引 Claude Code 社群帖子區塊新增條目。

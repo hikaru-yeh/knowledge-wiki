@@ -2,7 +2,7 @@
 網址: https://www.threads.com/@resen168/post/DX8jpFiEVQx
 作者: ["@resen168"]
 tags: []
-status: stub
+status: wiki
 ---
 
 ## Main Content

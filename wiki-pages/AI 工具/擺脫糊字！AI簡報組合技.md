@@ -2,7 +2,7 @@
 網址: https://www.threads.com/@yofish.read/post/DWRHpNkD8Pl
 作者: ["@yofish.read"]
 tags: []
-status: stub
+status: wiki
 ---
 
 ## Main Content

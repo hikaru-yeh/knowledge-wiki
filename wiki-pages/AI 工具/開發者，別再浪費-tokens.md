@@ -2,7 +2,7 @@
 網址: https://www.threads.com/@pv2dev/post/DXR7KljjJmd
 作者: ["@pv2dev"]
 tags: []
-status: stub
+status: wiki
 ---
 
 ## Main Content
