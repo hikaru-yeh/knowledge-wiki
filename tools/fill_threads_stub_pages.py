@@ -267,6 +267,7 @@ def fetch_author_content(url: str, target_handle: str) -> AuthorContentResult:
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
+    text = text.lstrip("﻿")  # strip UTF-8 BOM (U+FEFF) added by some Windows editors
     if not text.startswith("---"):
         raise RuntimeError("頁面缺少 frontmatter")
 

@@ -37,7 +37,6 @@ status: wiki
 | [[Abu 是泰國人 LingOrm 東摸摸西摸摸]]（📌 stub） |
 | [[考古級發現 LingOrm 入坑神曲]] |
 | [[OrmLing 西裝公主續寫]] |
-| [[Lingorm 群組八卦懶人包]]（📌 stub） |
 | [00田馥甄混剪小幸運](<../LingOrm/LingOrm 系列/00田馥甄混剪小幸運.md>)（📌 stub） |
 | [繪夢婚禮最喜歡睡衣（訪談）](<../LingOrm/LingOrm 系列/繪夢婚禮最喜歡睡衣（訪談）.md>)（📌 stub） |
 | [Only you 心動剪輯](<../LingOrm/LingOrm 系列/Only you 心動剪輯.md>)（📌 stub） |
@@ -95,6 +94,7 @@ status: wiki
 | [LingOrm客串Oombam新劇，00k親餵閃瞎](<../LingOrm/鄺玲玲系列/LingOrm客串Oombam新劇，00k親餵閃瞎.md>)（📌 stub） |
 | [LingOrm的戀愛經：放閃互懟，愛如初見](<../LingOrm/鄺玲玲系列/LingOrm的戀愛經：放閃互懟，愛如初見.md>)（📌 stub） |
 | [Lingling的蘿蔔蹲閃捧花](<../LingOrm/鄺玲玲系列/Lingling的蘿蔔蹲閃捧花.md>)（📌 stub） |
+| [Lingorm 群組八卦懶人包](<../LingOrm/鄺玲玲系列/Lingorm 群組八卦懶人包.md>)（📌 stub） |
 | [Ling慣用中文秒被發現](<../LingOrm/鄺玲玲系列/Ling慣用中文秒被發現.md>)（📌 stub） |
 | [Ling與00k：眼神中的入坑線索](<../LingOrm/鄺玲玲系列/Ling與00k：眼神中的入坑線索.md>)（📌 stub） |
 | [Ling與Orm：愛是彼此的滋養](<../LingOrm/鄺玲玲系列/Ling與Orm：愛是彼此的滋養.md>)（📌 stub） |

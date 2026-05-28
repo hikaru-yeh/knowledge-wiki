@@ -1,4 +1,4 @@
-﻿---
+---
 網址: https://www.threads.com/@ainotes0313/post/DYRkRCWidl9
 作者: ["@ainotes0313"]
 tags: [AI]

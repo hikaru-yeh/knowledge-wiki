@@ -31,7 +31,7 @@ status: wiki
 | [[Claude 蒸餾 Skill-Set 大禮包]]                     | 蒸餾他人腦力成 Skill，丟網址給 Claude Code / Codex 直接抽技能                                                  |
 | [[免費 Skill 助你建智能設計部]]                           | 10 人設計部門 Skill 組，模組化 Skill 維護效率更高                                                             |
 | [[5個必裝 Codex Skill 體驗升級]]                       | awesome-codex 11K / repomix 25K / follow-builders / codex++ / keep-fast                       |
-| [技能包大總管](<../AI 工具/AI Agent/技能包大總管.md>)                                      | 4 模式：觸發詞健檢 / Skill 快篩 / 整併拆分 / 更新檢查                                                           |
+| [技能包大總管](<../AI 工具/AI Agent/技能包大總管.md>)         | 4 模式：觸發詞健檢 / Skill 快篩 / 整併拆分 / 更新檢查                                                           |
 | [[Google Skills：官方 AI 產品技能庫]]                   | 官方 10K stars，npx skills add google/skills，Gemini/Cloud/BigQuery                               |
 | [[CLAUDE.md 與記憶設定]]                             | 情境工程五步驟、模組化配置、Claude-Mem、Obsidian 三層機制                                                        |
 | [[讓 AI coding 記得你的專案]]                          | agentmemory 為 AI coding 提供長期專案記憶                                                              |

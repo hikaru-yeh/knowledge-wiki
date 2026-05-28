@@ -188,6 +188,7 @@ def normalize_rel_path(path: Path, root: Path) -> str:
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
+    text = text.lstrip("﻿")  # strip UTF-8 BOM (U+FEFF) added by some Windows editors
     if not text.startswith("---"):
         return {}, text
 
@@ -2542,6 +2543,466 @@ def command_scan(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# pending-match: compare external pending digest URLs against wiki URLs
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PendingRecord:
+    path: Path
+    rel_path: str          # relative to pending_dir
+    url: str
+    title: str
+
+
+def load_pending_records(pending_dir: Path) -> list[PendingRecord]:
+    """Load all .md files from an external pending digest directory."""
+    records: list[PendingRecord] = []
+    if not pending_dir.exists():
+        return records
+    for path in sorted(pending_dir.rglob("*.md")):
+        if any(part.startswith(".") for part in path.relative_to(pending_dir).parts):
+            continue
+        text = read_text(path)
+        frontmatter, _body = parse_frontmatter(text)
+        url = normalize_url(frontmatter.get("url") or frontmatter.get("網址") or "")
+        title = frontmatter.get("title") or path.stem
+        try:
+            rel = path.relative_to(pending_dir).as_posix()
+        except ValueError:
+            rel = path.name
+        records.append(PendingRecord(path=path, rel_path=rel, url=url, title=title))
+    return records
+
+
+@dataclass(frozen=True)
+class PendingMatchResult:
+    matched_one: list[tuple[PendingRecord, PageRecord]]       # exactly 1 wiki match
+    no_match: list[PendingRecord]                             # 0 wiki matches
+    duplicate_match: list[tuple[PendingRecord, list[PageRecord]]]  # >1 wiki matches
+    pending_missing_url: list[PendingRecord]                  # pending has no url
+
+
+def collect_pending_match(pending_dir: Path, root: Path, wiki_dir: Path) -> PendingMatchResult:
+    pending_records = load_pending_records(pending_dir)
+    wiki_pages = load_wiki_pages(root, wiki_dir)
+
+    wiki_by_url: dict[str, list[PageRecord]] = {}
+    for page in wiki_pages:
+        if page.url:
+            wiki_by_url.setdefault(page.url, []).append(page)
+
+    matched_one: list[tuple[PendingRecord, PageRecord]] = []
+    no_match: list[PendingRecord] = []
+    duplicate_match: list[tuple[PendingRecord, list[PageRecord]]] = []
+    pending_missing_url: list[PendingRecord] = []
+
+    for record in pending_records:
+        if not record.url:
+            pending_missing_url.append(record)
+            continue
+        wiki_hits = wiki_by_url.get(record.url, [])
+        if len(wiki_hits) == 0:
+            no_match.append(record)
+        elif len(wiki_hits) == 1:
+            matched_one.append((record, wiki_hits[0]))
+        else:
+            duplicate_match.append((record, wiki_hits))
+
+    return PendingMatchResult(
+        matched_one=matched_one,
+        no_match=no_match,
+        duplicate_match=duplicate_match,
+        pending_missing_url=pending_missing_url,
+    )
+
+
+def render_pending_match_report(result: PendingMatchResult, report_date: str, pending_dir: Path) -> str:
+    total = (
+        len(result.matched_one)
+        + len(result.no_match)
+        + len(result.duplicate_match)
+        + len(result.pending_missing_url)
+    )
+    lines = [
+        f"# Pending Digest Match Report - {report_date}",
+        "",
+        f"Pending directory: `{pending_dir.as_posix()}`",
+        "",
+        "This is a report-only scan. No wiki files were modified.",
+        "",
+        "## Summary",
+        "",
+        f"- Total pending files: {total}",
+        f"- Matched one wiki page: {len(result.matched_one)}",
+        f"- No wiki match: {len(result.no_match)}",
+        f"- Duplicate wiki match: {len(result.duplicate_match)}",
+        f"- Pending missing URL: {len(result.pending_missing_url)}",
+        "",
+        "## Matched One Wiki Page",
+        "",
+    ]
+    if result.matched_one:
+        lines.extend(["| Pending File | Wiki Page |", "|---|---|"])
+        for pending, page in result.matched_one:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | `{markdown_cell(page.rel_path)}` |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## No Wiki Match", ""])
+    if result.no_match:
+        lines.extend(["| Pending File | URL |", "|---|---|"])
+        for pending in result.no_match:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | {markdown_cell(pending.url)} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Duplicate Wiki Match", ""])
+    if result.duplicate_match:
+        lines.extend(["| Pending File | URL | Wiki Pages |", "|---|---|---|"])
+        for pending, pages in result.duplicate_match:
+            wiki_list = ", ".join(f"`{markdown_cell(p.rel_path)}`" for p in pages)
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | {markdown_cell(pending.url)} | {wiki_list} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Pending Missing URL", ""])
+    if result.pending_missing_url:
+        lines.extend(["| Pending File |", "|---|"])
+        for pending in result.pending_missing_url:
+            lines.append(f"| `{markdown_cell(pending.rel_path)}` |")
+    else:
+        lines.append("None.")
+
+    return "\n".join(lines)
+
+
+def unique_pending_match_report_path(report_dir: Path, report_date: str) -> Path:
+    first_path = report_dir / f"pending-match-{report_date}.md"
+    if not first_path.exists():
+        return first_path
+    for index in range(2, 1000):
+        path = report_dir / f"pending-match-{report_date}-{index}.md"
+        if not path.exists():
+            return path
+    raise RuntimeError(f"too many pending-match reports already exist for {report_date}")
+
+
+def command_pending_match(args: argparse.Namespace) -> int:
+    if not args.pending_dir:
+        print("error: --pending-dir is required", file=sys.stderr)
+        print("usage: pending-match --pending-dir PATH [--report]", file=sys.stderr)
+        return 2
+
+    root = args.root.resolve()
+    pending_dir = Path(args.pending_dir).resolve()
+
+    if not pending_dir.exists():
+        print(f"error: pending directory does not exist: {args.pending_dir}", file=sys.stderr)
+        return 2
+    if not pending_dir.is_dir():
+        print(f"error: pending-dir is not a directory: {args.pending_dir}", file=sys.stderr)
+        return 2
+
+    result = collect_pending_match(pending_dir, root, Path(args.wiki_dir))
+    total = (
+        len(result.matched_one)
+        + len(result.no_match)
+        + len(result.duplicate_match)
+        + len(result.pending_missing_url)
+    )
+
+    print("pending-match")
+    print(f"pending directory: {pending_dir.as_posix()}")
+    print(f"total pending files: {total}")
+    print(f"matched one wiki page: {len(result.matched_one)}")
+    for pending, page in result.matched_one[:20]:
+        print(f"  {pending.rel_path} -> {page.rel_path}")
+    if len(result.matched_one) > 20:
+        print(f"  ... and {len(result.matched_one) - 20} more")
+    print(f"no wiki match: {len(result.no_match)}")
+    for pending in result.no_match[:10]:
+        print(f"  {pending.rel_path} | {pending.url}")
+    if len(result.no_match) > 10:
+        print(f"  ... and {len(result.no_match) - 10} more")
+    print(f"duplicate wiki match: {len(result.duplicate_match)}")
+    for pending, pages in result.duplicate_match[:10]:
+        wiki_paths = ", ".join(p.rel_path for p in pages)
+        print(f"  {pending.rel_path} | {pending.url} | [{wiki_paths}]")
+    if len(result.duplicate_match) > 10:
+        print(f"  ... and {len(result.duplicate_match) - 10} more")
+    print(f"pending missing url: {len(result.pending_missing_url)}")
+    for pending in result.pending_missing_url[:10]:
+        print(f"  {pending.rel_path}")
+    if len(result.pending_missing_url) > 10:
+        print(f"  ... and {len(result.pending_missing_url) - 10} more")
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
+            report_path = unique_pending_match_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+        except (RuntimeError, ValueError) as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
+        write_text(report_path, render_pending_match_report(result, report_date, pending_dir))
+        print(f"wrote {normalize_rel_path(report_path, root)}")
+
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# promote-ready: find non-LingOrm stubs with substantial content
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PromoteReadyEntry:
+    page: PageRecord
+    body_length: int
+    heading_count: int
+    reason: str
+
+
+@dataclass(frozen=True)
+class PromoteReadyResult:
+    ready: list[PromoteReadyEntry]
+    blocked: list[PageRecord]   # empty body or URL-only — go to blocked, not ready
+
+
+PROMOTE_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
+PROMOTE_PLACEHOLDER_RE = re.compile(r"（📌\s*待消化）|\(📌\s*待消化\)|📌\s*待消化")
+
+
+def _count_body_headings(body: str) -> int:
+    return len(PROMOTE_HEADING_RE.findall(body))
+
+
+def _body_has_substantial_content(body: str) -> bool:
+    """Return True if body has real content (not just frontmatter lines or URLs)."""
+    meaningful: list[str] = []
+    for raw_line in body.replace("\r\n", "\n").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            continue
+        if line.startswith(("http://", "https://")):
+            continue
+        if line in {"[]", "[ ]", "---"}:
+            continue
+        if line in PLACEHOLDER_MARKERS:
+            continue
+        if line.startswith(("- [[", "* [[", "[[")):
+            continue
+        if line.startswith("- [") and "](" in line:
+            continue
+        meaningful.append(line)
+    total_chars = sum(len(line) for line in meaningful)
+    return total_chars >= 80 or len(meaningful) >= 3
+
+
+def collect_promote_ready(root: Path, wiki_dir: Path) -> PromoteReadyResult:
+    """Identify non-LingOrm stub pages ready for promotion."""
+    pages = load_wiki_pages(root, wiki_dir)
+    ready: list[PromoteReadyEntry] = []
+    blocked: list[PageRecord] = []
+
+    for page in pages:
+        # Only look at stub pages
+        if normalize_status(page.status) != "stub":
+            continue
+        # Skip index pages
+        if page.category == "index" or page.wiki_rel_path.startswith("index/"):
+            continue
+        # Skip LingOrm — per project rules they can stay stub forever
+        if "LingOrm" in page.category or "LingOrm" in page.wiki_rel_path:
+            continue
+
+        body = page.body
+        body_length = len(body)
+        heading_count = _count_body_headings(body)
+
+        # Pages with empty body or only URL go to blocked
+        if not body.strip() or (body_length < 30 and ("http://" in body or "https://" in body)):
+            blocked.append(page)
+            continue
+
+        # Pages with 待消化 marker are not ready
+        if PROMOTE_PLACEHOLDER_RE.search(body):
+            continue
+
+        # Readiness criteria (any one sufficient):
+        reasons: list[str] = []
+        if body_length > 300:
+            reasons.append(f"body>{300}chars")
+        if heading_count >= 2:
+            reasons.append(f"{heading_count}headings")
+        if _body_has_substantial_content(body) and body_length > 150:
+            reasons.append("substantial-content")
+
+        if reasons:
+            ready.append(PromoteReadyEntry(
+                page=page,
+                body_length=body_length,
+                heading_count=heading_count,
+                reason=", ".join(reasons),
+            ))
+
+    return PromoteReadyResult(ready=ready, blocked=blocked)
+
+
+def render_promote_ready_report(result: PromoteReadyResult, report_date: str) -> str:
+    lines = [
+        f"# Promote-Ready Stubs - {report_date}",
+        "",
+        "This is a report-only scan. No wiki files were modified.",
+        "LingOrm pages are excluded per project rules.",
+        "",
+        "## Summary",
+        "",
+        f"- Ready to promote: {len(result.ready)}",
+        f"- Blocked (empty/URL-only body): {len(result.blocked)}",
+        "",
+        "## Ready to Promote",
+        "",
+    ]
+    if result.ready:
+        lines.extend(["| Page | Body chars | Headings | Reason |", "|---|---:|---:|---|"])
+        for entry in result.ready:
+            path = markdown_cell(entry.page.rel_path)
+            lines.append(
+                f"| `{path}` | {entry.body_length} | {entry.heading_count} | {markdown_cell(entry.reason)} |"
+            )
+    else:
+        lines.append("No stub pages ready for promotion detected.")
+
+    lines.extend(["", "## Blocked (empty or URL-only body)", ""])
+    if result.blocked:
+        lines.extend(["| Page | Category |", "|---|---|"])
+        for page in result.blocked:
+            lines.append(
+                f"| `{markdown_cell(page.rel_path)}` | {markdown_cell(page.category or '(root)')} |"
+            )
+    else:
+        lines.append("None.")
+
+    if result.ready:
+        lines.extend([
+            "",
+            "> Note: `--apply` is not implemented for this subcommand.",
+            "> Review the list above and promote pages manually or via a future apply command.",
+        ])
+
+    return "\n".join(lines)
+
+
+def unique_promote_ready_report_path(report_dir: Path, report_date: str) -> Path:
+    first_path = report_dir / f"promote-ready-{report_date}.md"
+    if not first_path.exists():
+        return first_path
+    for index in range(2, 1000):
+        path = report_dir / f"promote-ready-{report_date}-{index}.md"
+        if not path.exists():
+            return path
+    raise RuntimeError(f"too many promote-ready reports already exist for {report_date}")
+
+
+def command_promote_ready(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    result = collect_promote_ready(root, Path(args.wiki_dir))
+
+    print("promote-ready")
+    print(f"ready to promote: {len(result.ready)}")
+    for entry in result.ready[:30]:
+        print(f"  {entry.page.rel_path} [body={entry.body_length} headings={entry.heading_count}] {entry.reason}")
+    if len(result.ready) > 30:
+        print(f"  ... and {len(result.ready) - 30} more")
+    print(f"blocked (empty/url-only): {len(result.blocked)}")
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
+            report_path = unique_promote_ready_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+        except (RuntimeError, ValueError) as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
+        write_text(report_path, render_promote_ready_report(result, report_date))
+        print(f"wrote {normalize_rel_path(report_path, root)}")
+
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# audit-list: list open items from audit/*.md
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AuditItem:
+    filename: str
+    severity: str
+    target: str
+    comment_first_line: str
+
+
+def load_audit_items(audit_dir: Path) -> list[AuditItem]:
+    """Parse audit/*.md files for severity, target, and first comment line."""
+    items: list[AuditItem] = []
+    for path in sorted(audit_dir.glob("*.md")):
+        text = read_text(path)
+        frontmatter, body = parse_frontmatter(text)
+        severity = frontmatter.get("severity", "").strip()
+        target = frontmatter.get("target", "").strip()
+        # First non-empty body line as comment preview
+        comment_first_line = ""
+        for raw_line in body.replace("\r\n", "\n").splitlines():
+            stripped = raw_line.strip()
+            if stripped and not stripped.startswith("#"):
+                comment_first_line = stripped[:120]
+                break
+        items.append(AuditItem(
+            filename=path.name,
+            severity=severity,
+            target=target,
+            comment_first_line=comment_first_line,
+        ))
+    return items
+
+
+def command_audit_list(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    audit_dir = root / "audit"
+
+    if not audit_dir.exists() or not audit_dir.is_dir():
+        print("no audit directory")
+        return 0
+
+    items = load_audit_items(audit_dir)
+    if not items:
+        print("audit directory exists but contains no .md files")
+        return 0
+
+    print(f"audit-list: {len(items)} item(s)")
+    print("")
+    for item in items:
+        severity_label = f"[{item.severity}] " if item.severity else ""
+        target_label = f"target: {item.target} | " if item.target else ""
+        comment = item.comment_first_line or "(no comment)"
+        print(f"  {item.filename}")
+        print(f"    {severity_label}{target_label}{comment}")
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Repo-specific report-only wiki maintenance helpers.",
@@ -2635,6 +3096,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Actually write fixes (default is dry-run).",
     )
     bare_link_fix.set_defaults(func=command_bare_link_fix)
+
+    pending_match = subparsers.add_parser(
+        "pending-match",
+        help="Compare external pending digest URLs against wiki page URLs (report-only).",
+    )
+    pending_match.add_argument(
+        "--pending-dir",
+        required=True,
+        help="Path to external pending digest directory (required, not hardcoded).",
+    )
+    pending_match.add_argument("--report", action="store_true", help="Write a dated pending-match Markdown report.")
+    pending_match.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    pending_match.set_defaults(func=command_pending_match)
+
+    promote_ready = subparsers.add_parser(
+        "promote-ready",
+        help="List non-LingOrm stub pages with substantial content ready for promotion (report-only).",
+    )
+    promote_ready.add_argument("--report", action="store_true", help="Write a dated promote-ready Markdown report.")
+    promote_ready.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    promote_ready.set_defaults(func=command_promote_ready)
+
+    audit_list = subparsers.add_parser(
+        "audit-list",
+        help="List open items from the audit/ directory.",
+    )
+    audit_list.set_defaults(func=command_audit_list)
 
     return parser
 
