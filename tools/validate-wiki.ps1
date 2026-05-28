@@ -18,6 +18,7 @@ if ($PendingDir -ne "") {
 
 # Run scan — capture output and display it
 $output = python @scanArgs 2>&1
+$scanExitCode = $LASTEXITCODE
 $output | Write-Host
 
 # Parse totals line: "totals: errors=N warnings=M info=P"
@@ -25,6 +26,24 @@ $totalsLine = $output | Where-Object { $_ -match "^totals:" } | Select-Object -F
 $errorCount = 0
 if ($totalsLine -match "errors=(\d+)") {
     $errorCount = [int]$matches[1]
+}
+
+# Fail if scan process crashed (non-zero exit, no errors parsed)
+if ($errorCount -eq 0 -and $scanExitCode -ne 0) {
+    Write-Host ""
+    Write-Host "=== validate-wiki summary ==="
+    Write-Host ""
+    Write-Host "FAIL: wiki_maintain.py exited with code $scanExitCode (scan did not complete)." -ForegroundColor Red
+    exit 1
+}
+
+# Fail if totals line was not found at all
+if ($null -eq $totalsLine -or $totalsLine -eq "") {
+    Write-Host ""
+    Write-Host "=== validate-wiki summary ==="
+    Write-Host ""
+    Write-Host "FAIL: 'totals:' line not found in scan output." -ForegroundColor Red
+    exit 1
 }
 
 Write-Host ""
