@@ -2978,6 +2978,7 @@ def apply_promote_ready(
 ) -> tuple[list[str], list[tuple[str, str]]]:
     """Promote up to *limit* stub pages to wiki status.
 
+    *wiki_dir* may be relative (to *root*) or absolute.
     Returns (promoted_paths, errors) where promoted_paths are repo-relative
     paths (forward-slash) and errors are (path, message) pairs.
     """
@@ -2985,7 +2986,8 @@ def apply_promote_ready(
     promoted: list[str] = []
     errors: list[tuple[str, str]] = []
 
-    wiki_abs = (root / wiki_dir).resolve()
+    # Accept either relative or absolute wiki_dir.
+    wiki_abs = wiki_dir if wiki_dir.is_absolute() else (root / wiki_dir).resolve()
 
     for entry in to_promote:
         page = entry.page
@@ -3040,9 +3042,8 @@ def command_promote_ready(args: argparse.Namespace) -> int:
     print(f"blocked (empty/url-only): {len(result.blocked)}")
 
     if apply_mode:
-        wiki_abs = (root / wiki_dir).resolve()
         promoted, errors = apply_promote_ready(
-            result.ready, root, wiki_abs, limit=limit, dry_run=False
+            result.ready, root, wiki_dir, limit=limit, dry_run=False
         )
         print(f"\nPromoted {len(promoted)} pages.")
         for path in promoted:

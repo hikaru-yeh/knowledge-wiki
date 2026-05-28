@@ -1,13 +1,13 @@
 # Current Handoff
 
-- Generated: 2026-05-28 (batch 3)
-- Task: new subcommands, BOM defense, LingOrm dedup, Playwright fill attempt
-- Next: promote 9 ready stubs, safe apply flows
+- Generated: 2026-05-28 (batch 4)
+- Task: batch promote 7 AI 工具 stubs, implement promote-ready --apply
+- Next: inject-pending --apply, canonical cleanup, CI gates
 - Current branch during this update: `master`
 
 ## Current State Summary
 
-Wiki maintenance v2 has moved past the original skeleton phase. The report-first core is mostly active, but the maintenance framework is **not complete** and apply-style workflows should still be avoided.
+Wiki maintenance v2 apply-phase has begun. `promote-ready --apply` is now live. The remaining apply-style workflows (inject-pending --apply) are still not implemented.
 
 Available subcommands in `tools/wiki_maintain.py`:
 
@@ -23,8 +23,17 @@ Available subcommands in `tools/wiki_maintain.py`:
 - `author-fix` — repair bare-string `作者` fields into canonical list format
 - `bare-link-fix` — convert ambiguous bare `[[wikilinks]]` to explicit relative links in index files
 - `pending-match` — compare external pending digest URLs against wiki page URLs
-- `promote-ready` — list non-LingOrm stub pages with substantial content (report-only)
+- `promote-ready` — list or apply promotion of non-LingOrm stubs (`--apply`, `--limit N`)
 - `audit-list` — list open items from the audit/ directory
+
+## Batch 4 Completions
+
+- **7 AI 工具 stubs promoted** (stub→wiki): AI-企業作業系統降臨、AI進化超速、Paperclip、Vibe-Coding-亂象、擺脫糊字AI簡報、用Obsidian建立LLM知識庫、開發者別再浪費tokens
+- **Dashboard updated**: AI 工具 Wiki 209→216, Stub 12→5; header Wiki 359→366, Stub 93→86
+- **`promote-ready --apply` implemented** in `tools/wiki_maintain.py`: new helpers `_promote_stub_to_wiki`, `_remove_stub_marker_from_index_files`, `_build_stub_marker_patterns`, `apply_promote_ready`; CLI flags `--apply` and `--limit N` added to parser
+- **Commit**: `6ef6b64`
+- **promote-ready post-check**: 0 ready stubs remain
+- **index-lint post-check**: 0 total issues, stub-marker-mismatch: 0
 
 ## Claude Code / Worker Completed Tasks Captured
 
@@ -145,15 +154,12 @@ Files outside the monitored set (`raw/`, `.obsidian/`, `wiki-pages/`, etc.) are 
 
 Still not completed:
 
-- `pending-match`
-- `inject-pending`
-- `promote-ready`
-- `audit-list`
-- safe apply flows for promote / ingest / index repair
+- `inject-pending` (subcommand exists as report-only; `--apply` not implemented)
+- `inject-pending --apply` — apply-style batch ingest from pending digest
 - canonical cleanup automation
 - delegate integration
 - CI/report cleanliness gates
-- README/tool docs for any future apply commands
+- README/tool docs for apply commands
 
 ### Known remaining issues
 
@@ -162,13 +168,13 @@ Still not completed:
 
 ## Explicit Next Step
 
-All report-only subcommands are complete. Next priorities:
+`promote-ready --apply` is live. All 7 qualified AI 工具 stubs promoted. Next priorities:
 
-1. **Promote 9 ready stubs** — `promote-ready` found 9 pages with substantial content. Review findings and batch promote (7 AI 工具 are solid, 2 求職履歷 are borderline). Consider implementing `promote-ready --apply`.
-2. **Safe apply flows** — implement `promote-ready --apply` and `inject-pending --apply` with `--dry-run` default.
-3. **Playwright auth** — inject Threads session cookie into `fill_threads_stub_pages.py` for the 2 blocked 求職履歷 stubs.
+1. **`inject-pending --apply`** — implement apply-style batch ingest. Spec mirrors `promote-ready --apply`: default dry-run, `--apply` flag required to write, `--limit N` to cap batch size.
+2. **Canonical cleanup** — `canonical-guard` still reports conflicts; implement auto-fix or guided workflow.
+3. **CI gates** — add report-cleanliness checks to prevent regressions.
 
-Do not begin `inject-pending --apply` or `promote-ready --apply` until the dry-run/report layer has been reviewed.
+Dashboard is current. No pending promote queue.
 
 ## Do Not Touch
 

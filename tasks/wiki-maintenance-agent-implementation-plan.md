@@ -61,9 +61,7 @@ audit-list
 
 ### 尚未完成
 
-- `inject-pending`
-- `promote-ready --apply`
-- safe apply flows for promote / ingest / index repair
+- `inject-pending --apply`（subcommand 存在但僅 report-only）
 - canonical cleanup automation
 - delegate integration
 - CI/report cleanliness gates
@@ -83,10 +81,10 @@ audit-list
 8. 再評估 `inject-pending --dry-run`
 9. ~~LingOrm content dedup~~ ✅ 已完成（2026-05-28，commit `650e21c`，deleted LingOrm 系列 duplicate，kept 鄺玲玲系列）
 10. ~~BOM frontmatter fix~~ ✅ 已完成（2026-05-28，commit `650e21c`，3 parsers patched + file BOM stripped）
-11. `promote-ready --apply`（9 stubs ready，需 review 後批次 promote）
-12. Playwright auth cookie injection（2 求職履歷 stubs blocked by login wall）
+11. ~~`promote-ready --apply`~~ ✅ 已完成（2026-05-28，commit `6ef6b64`，7 stubs promoted，dashboard updated）
+12. ~~Playwright auth cookie injection~~ ✅ N/A（2 求職履歷 stubs 來源帖文已刪除，頁面已刪除，commit `82cee22`）
 
-`inject-pending --apply`、`promote-ready --apply`、index repair apply 都應等 report-only 層穩定且被人工 review 後再做。
+`inject-pending --apply` 應等 inject-pending report-only 層穩定且被人工 review 後再做。
 
 ## 0. 任務目標
 
@@ -1149,18 +1147,18 @@ python tools/wiki_maintain.py blocked-report
 python tools/wiki_maintain.py scan --report
 ```
 
-## Task 11: 實作可選寫入命令 🔧 部分完成
+## Task 11: 實作可選寫入命令 ✅ 部分完成（promote-ready --apply 已實作）
 
 **Description:** 若前面都穩定，再實作 `inject-pending --apply` 與 `promote-ready --apply`。
 
-> **已完成的 apply 命令**：`author-fix --apply`（commit `822fd3f`）、`bare-link-fix --apply`（commit `bf2efa9`）皆符合以下所有 criteria。
-> **尚未實作**：`inject-pending --apply`、`promote-ready --apply`。
+> **已完成的 apply 命令**：`author-fix --apply`（commit `822fd3f`）、`bare-link-fix --apply`（commit `bf2efa9`）、`promote-ready --apply`（commit `6ef6b64`）皆符合以下所有 criteria。
+> **尚未實作**：`inject-pending --apply`。
 
 **Acceptance criteria:**
 - [x] 預設 dry-run（author-fix、bare-link-fix 已實作）
 - [x] 必須明確 `--apply`（同上）
 - [x] 寫入前列出檔案（同上）
-- [ ] 寫入後更新 `wiki-pages/log.md`（author-fix/bare-link-fix 未自動更新 log）
+- [x] 寫入後更新 `wiki-pages/log.md`（promote-ready --apply 已實作）
 - [x] 不碰 raw
 
 **Verification:**
