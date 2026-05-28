@@ -994,14 +994,14 @@ git status --short
 
 ## 10. 實作任務順序
 
-## Task 1: 建立 CLI skeleton
+## Task 1: 建立 CLI skeleton ✅
 
 **Description:** 建立 `tools/wiki_maintain.py`，支援 argparse、共用 options、subcommands stub。
 
 **Acceptance criteria:**
-- [ ] `python tools/wiki_maintain.py --help` 顯示所有 subcommands
-- [ ] 每個 subcommand 至少可執行並顯示 not implemented 或空 report
-- [ ] 無第三方 dependency
+- [x] `python tools/wiki_maintain.py --help` 顯示所有 subcommands
+- [x] 每個 subcommand 至少可執行並顯示 not implemented 或空 report
+- [x] 無第三方 dependency
 
 **Files touched:**
 - `tools/wiki_maintain.py`
@@ -1013,14 +1013,14 @@ python tools/wiki_maintain.py --help
 python tools/wiki_maintain.py scan --help
 ```
 
-## Task 2: 實作 frontmatter 與 page/raw loader
+## Task 2: 實作 frontmatter 與 page/raw loader ✅
 
 **Description:** 實作 `parse_frontmatter`、`normalize_url`、`load_wiki_pages`、`load_raw_records`。
 
 **Acceptance criteria:**
-- [ ] 可讀取所有 wiki markdown，不因無 frontmatter crash
-- [ ] 可讀取 raw markdown，不寫入 raw
-- [ ] URL normalize 正確
+- [x] 可讀取所有 wiki markdown，不因無 frontmatter crash
+- [x] 可讀取 raw markdown，不寫入 raw
+- [x] URL normalize 正確
 
 **Verification:**
 
@@ -1028,13 +1028,13 @@ python tools/wiki_maintain.py scan --help
 python tools/wiki_maintain.py scan --json
 ```
 
-## Task 3: 實作 canonical-guard
+## Task 3: 實作 canonical-guard ✅
 
 **Description:** 偵測 stale/canonical conflict。
 
 **Acceptance criteria:**
-- [ ] 能列出 `日誌.md`、`AI 工具索引.md`、`鄺玲玲-索引.md` 等存在的 stale files
-- [ ] 不自動刪除
+- [x] 能列出 `日誌.md`、`AI 工具索引.md`、`鄺玲玲-索引.md` 等存在的 stale files
+- [x] 不自動刪除
 
 **Verification:**
 
@@ -1042,14 +1042,14 @@ python tools/wiki_maintain.py scan --json
 python tools/wiki_maintain.py canonical-guard
 ```
 
-## Task 4: 實作 duplicate URL scanner
+## Task 4: 實作 duplicate URL scanner ✅
 
 **Description:** 找出 wiki-pages 中 frontmatter `網址/url` 重複 groups。
 
 **Acceptance criteria:**
-- [ ] report 列出每組 URL、全部頁面、建議 canonical
-- [ ] path 使用 `/`
-- [ ] 不修改檔案
+- [x] report 列出每組 URL、全部頁面、建議 canonical
+- [x] path 使用 `/`
+- [x] 不修改檔案
 
 **Verification:**
 
@@ -1057,15 +1057,15 @@ python tools/wiki_maintain.py canonical-guard
 python tools/wiki_maintain.py duplicates --report
 ```
 
-## Task 5: 實作 index-lint
+## Task 5: 實作 index-lint ✅
 
 **Description:** 檢查 index raw links、broken links、ambiguous links、stub/status mismatch、重點欄違規。
 
 **Acceptance criteria:**
-- [ ] LingOrm 例外生效
-- [ ] broken links 能列 path + line
-- [ ] stub mismatch 能列 index row 與 page status
-- [ ] URL-only summary 能列 warning
+- [x] LingOrm 例外生效
+- [x] broken links 能列 path + line
+- [x] stub mismatch 能列 index row 與 page status
+- [x] URL-only summary 能列 warning
 
 **Verification:**
 
@@ -1073,14 +1073,14 @@ python tools/wiki_maintain.py duplicates --report
 python tools/wiki_maintain.py index-lint --report
 ```
 
-## Task 6: 實作 coverage
+## Task 6: 實作 coverage ✅
 
 **Description:** 比對 raw URL 與 wiki URL，列 raw-only ingest candidates。
 
 **Acceptance criteria:**
-- [ ] raw-only URL list 正確
-- [ ] skipped no-url raw list 正確
-- [ ] 有 heuristic category
+- [x] raw-only URL list 正確
+- [x] skipped no-url raw list 正確
+- [x] 有 heuristic category
 
 **Verification:**
 
@@ -1088,14 +1088,14 @@ python tools/wiki_maintain.py index-lint --report
 python tools/wiki_maintain.py coverage --report
 ```
 
-## Task 7: 實作 pending-match
+## Task 7: 實作 pending-match ✅
 
 **Description:** 比對 pending digest URL 與 wiki URL。
 
 **Acceptance criteria:**
-- [ ] matched one / no match / duplicate match / missing url 分組
-- [ ] 不寫入 wiki
-- [ ] pending dir 必須由 CLI 傳入
+- [x] matched one / no match / duplicate match / missing url 分組
+- [x] 不寫入 wiki
+- [x] pending dir 必須由 CLI 傳入
 
 **Verification:**
 
@@ -1103,14 +1103,14 @@ python tools/wiki_maintain.py coverage --report
 python tools/wiki_maintain.py pending-match --pending-dir "D:\shane_yeh\Documents\_Claude_Code\crawl-the-threads\data\pending-digest-app-output" --report
 ```
 
-## Task 8: 實作 promote-ready dry-run
+## Task 8: 實作 promote-ready dry-run ✅
 
 **Description:** 找出已補完整內容、可 promote 的非 LingOrm stubs。
 
 **Acceptance criteria:**
-- [ ] LingOrm 排除
-- [ ] ready/not-ready 有理由
-- [ ] 不寫入
+- [x] LingOrm 排除
+- [x] ready/not-ready 有理由
+- [x] 不寫入
 
 **Verification:**
 
@@ -1118,14 +1118,14 @@ python tools/wiki_maintain.py pending-match --pending-dir "D:\shane_yeh\Document
 python tools/wiki_maintain.py promote-ready --report
 ```
 
-## Task 9: 實作 handoff + blocked-report
+## Task 9: 實作 handoff + blocked-report ✅
 
 **Description:** 補上長任務接力能力與 blocked content gap 清單。
 
 **Acceptance criteria:**
-- [ ] `tasks/current-handoff.md` 可生成
-- [ ] `tasks/blocked-content-gaps.md` 可列出空白 stub / raw 缺正文頁
-- [ ] blocked 頁不會被 promote-ready 列為 ready
+- [x] `tasks/current-handoff.md` 可生成
+- [x] `tasks/blocked-content-gaps.md` 可列出空白 stub / raw 缺正文頁
+- [x] blocked 頁不會被 promote-ready 列為 ready
 
 **Verification:**
 
@@ -1134,14 +1134,14 @@ python tools/wiki_maintain.py handoff --task "demo" --next "demo-next"
 python tools/wiki_maintain.py blocked-report
 ```
 
-## Task 10: 實作 scan aggregator
+## Task 10: 實作 scan aggregator ✅
 
 **Description:** `scan` 一次跑所有 report-only checks。
 
 **Acceptance criteria:**
-- [ ] 產生總 report
-- [ ] summary table 有 issue counts
-- [ ] report 末尾有 Suggested Next Agent Prompt
+- [x] 產生總 report
+- [x] summary table 有 issue counts
+- [x] report 末尾有 Suggested Next Agent Prompt
 
 **Verification:**
 
@@ -1149,16 +1149,19 @@ python tools/wiki_maintain.py blocked-report
 python tools/wiki_maintain.py scan --report
 ```
 
-## Task 11: 實作可選寫入命令
+## Task 11: 實作可選寫入命令 🔧 部分完成
 
 **Description:** 若前面都穩定，再實作 `inject-pending --apply` 與 `promote-ready --apply`。
 
+> **已完成的 apply 命令**：`author-fix --apply`（commit `822fd3f`）、`bare-link-fix --apply`（commit `bf2efa9`）皆符合以下所有 criteria。
+> **尚未實作**：`inject-pending --apply`、`promote-ready --apply`。
+
 **Acceptance criteria:**
-- [ ] 預設 dry-run
-- [ ] 必須明確 `--apply`
-- [ ] 寫入前列出檔案
-- [ ] 寫入後更新 `wiki-pages/log.md`
-- [ ] 不碰 raw
+- [x] 預設 dry-run（author-fix、bare-link-fix 已實作）
+- [x] 必須明確 `--apply`（同上）
+- [x] 寫入前列出檔案（同上）
+- [ ] 寫入後更新 `wiki-pages/log.md`（author-fix/bare-link-fix 未自動更新 log）
+- [x] 不碰 raw
 
 **Verification:**
 
