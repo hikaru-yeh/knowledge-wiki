@@ -2341,13 +2341,24 @@ class ScanResult:
     coverage: CoverageResult
     duplicates: DuplicatesResult
     blocked: list[BlockedRecord]
+    inject_pending: "InjectPendingResult | None" = None
 
 
 def _section_summary(name: str, errors: int = 0, warnings: int = 0, info: int = 0) -> ScanSectionSummary:
     return ScanSectionSummary(name=name, errors=errors, warnings=warnings, info=info)
 
 
-def collect_scan(root: Path, wiki_dir: Path, raw_dir: Path) -> ScanResult:
+def collect_scan(
+    root: Path,
+    wiki_dir: Path,
+    raw_dir: Path,
+    pending_dir: "Path | None" = None,
+) -> ScanResult:
+    ip = (
+        collect_inject_pending(pending_dir, root, wiki_dir)
+        if pending_dir is not None
+        else None
+    )
     return ScanResult(
         status_audit=collect_status_audit(root, wiki_dir),
         canonical_guard=collect_canonical_guard(root, wiki_dir),
@@ -2355,6 +2366,7 @@ def collect_scan(root: Path, wiki_dir: Path, raw_dir: Path) -> ScanResult:
         coverage=collect_coverage(root, wiki_dir, raw_dir),
         duplicates=collect_duplicates(root, wiki_dir),
         blocked=collect_blocked_records(root, wiki_dir, raw_dir),
+        inject_pending=ip,
     )
 
 
@@ -2375,7 +2387,7 @@ def _scan_section_summaries(result: ScanResult) -> list[ScanSectionSummary]:
     blocked_nonlingorm = sum(1 for b in bl if b.policy_bucket == "blocked-nonlingorm")
     blocked_lingorm = sum(1 for b in bl if b.policy_bucket == "excluded-lingorm")
 
-    return [
+    summaries = [
         _section_summary("status-audit", errors=status_errors),
         _section_summary("author-validation", errors=author_errors),
         _section_summary("canonical-guard", errors=len(cg.stale_conflicts)),
@@ -2385,6 +2397,14 @@ def _scan_section_summaries(result: ScanResult) -> list[ScanSectionSummary]:
         _section_summary("blocked-nonlingorm", warnings=blocked_nonlingorm),
         _section_summary("blocked-lingorm", info=blocked_lingorm),
     ]
+    if result.inject_pending is not None:
+        ip = result.inject_pending
+        summaries.append(_section_summary(
+            "inject-pending",
+            info=len(ip.eligible),
+            warnings=len(ip.duplicate_match),
+        ))
+    return summaries
 
 
 def render_scan_report(result: ScanResult, report_date: str) -> str:
@@ -2497,6 +2517,27 @@ def render_scan_report(result: ScanResult, report_date: str) -> str:
         lines.append(f"{len(lingorm)} LingOrm stubs excluded by policy.")
         lines.append("")
 
+    if result.inject_pending is not None:
+        ip = result.inject_pending
+        lines += [
+            "## Inject Pending",
+            "",
+            f"- Eligible for injection: {len(ip.eligible)}",
+            f"- Already filled: {len(ip.already_filled)}",
+            f"- LingOrm skipped: {len(ip.lingorm_skipped)}",
+            f"- No wiki match: {len(ip.no_match)}",
+            f"- Duplicate match: {len(ip.duplicate_match)}",
+            f"- Missing URL: {len(ip.pending_missing_url)}",
+            "",
+        ]
+        if ip.eligible:
+            lines += ["### Eligible", ""]
+            for entry in ip.eligible:
+                lines.append(
+                    f"- `{entry.pending.rel_path}` → `{entry.wiki_page.rel_path}` [{entry.new_status}]"
+                )
+            lines.append("")
+
     lines.extend([
         "## Suggested Next Agent Prompt",
         "",
@@ -2525,9 +2566,11 @@ def command_scan(args: argparse.Namespace) -> int:
     root = args.root.resolve()
     wiki_dir = Path(args.wiki_dir)
     raw_dir = Path(args.raw_dir)
+    pending_dir_str = getattr(args, "pending_dir", None)
+    pending_dir = Path(pending_dir_str).resolve() if pending_dir_str else None
 
     print("scan: running all report-only checks...")
-    result = collect_scan(root, wiki_dir, raw_dir)
+    result = collect_scan(root, wiki_dir, raw_dir, pending_dir=pending_dir)
     sections = _scan_section_summaries(result)
 
     total_e = sum(s.errors for s in sections)
@@ -3496,6 +3539,12 @@ def build_parser() -> argparse.ArgumentParser:
     scan = subparsers.add_parser("scan", help="Run all report-only checks and produce a combined maintenance report.")
     scan.add_argument("--report", action="store_true", help="Write a dated maintenance report Markdown file.")
     scan.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    scan.add_argument(
+        "--pending-dir",
+        metavar="PATH",
+        default=None,
+        help="Optional: directory of pending digest output .md files. If provided, includes inject-pending results.",
+    )
     scan.set_defaults(func=command_scan)
 
     handoff = subparsers.add_parser("handoff", help="Write tasks/current-handoff.md for session recovery.")
