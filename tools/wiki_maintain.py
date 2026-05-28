@@ -1378,7 +1378,18 @@ def collect_coverage(root: Path, wiki_dir: Path, raw_dir: Path) -> CoverageResul
     raw_only: list[CoverageEntry] = []
     raw_missing_url: list[RawRecord] = []
 
+    # Load optional exclusion list (repo-relative forward-slash paths)
+    exclusion_file = root / "tasks" / "coverage-excluded-raw.txt"
+    excluded_raw: set[str] = set()
+    if exclusion_file.exists():
+        for line in read_text(exclusion_file).splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                excluded_raw.add(line)
+
     for record in raw_records:
+        if record.rel_path in excluded_raw:
+            continue
         if not record.url:
             raw_missing_url.append(record)
         elif record.url not in wiki_urls:

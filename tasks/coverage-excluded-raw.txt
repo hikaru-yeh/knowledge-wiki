@@ -1,0 +1,6 @@
+# Raw files excluded from coverage raw-only report.
+# Reasons: already merged under different wiki URL, or source post deleted.
+# Format: repo-relative forward-slash path, one per line. Lines starting with # are comments.
+raw/threads-iphone/threads-unknown-20260511-120523.md
+raw/threads-saved/有用免費證照.md
+raw/threads-saved/職涯分析Prompt.md
