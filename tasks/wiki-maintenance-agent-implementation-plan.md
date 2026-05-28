@@ -61,10 +61,10 @@ audit-list
 
 ### 尚未完成
 
-- `inject-pending --apply`（subcommand 存在但僅 report-only）
 - canonical cleanup automation
 - delegate integration
 - CI/report cleanliness gates
+- scan aggregator: inject-pending 需 --pending-dir，目前未納入 scan
 - 完整 README/tool docs for future apply commands
 
 ### 下一步建議
@@ -1147,12 +1147,11 @@ python tools/wiki_maintain.py blocked-report
 python tools/wiki_maintain.py scan --report
 ```
 
-## Task 11: 實作可選寫入命令 ✅ 部分完成（promote-ready --apply 已實作）
+## Task 11: 實作可選寫入命令 ✅ 完成
 
 **Description:** 若前面都穩定，再實作 `inject-pending --apply` 與 `promote-ready --apply`。
 
-> **已完成的 apply 命令**：`author-fix --apply`（commit `822fd3f`）、`bare-link-fix --apply`（commit `bf2efa9`）、`promote-ready --apply`（commit `6ef6b64`）皆符合以下所有 criteria。
-> **尚未實作**：`inject-pending --apply`。
+> **已完成的 apply 命令**：`author-fix --apply`（commit `822fd3f`）、`bare-link-fix --apply`（commit `bf2efa9`）、`promote-ready --apply`（commit `6ef6b64`）、`inject-pending --apply`（commit `bb61a7b`）皆符合以下所有 criteria。
 
 **Acceptance criteria:**
 - [x] 預設 dry-run（author-fix、bare-link-fix 已實作）

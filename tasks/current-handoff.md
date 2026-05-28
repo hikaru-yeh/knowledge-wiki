@@ -1,13 +1,13 @@
 # Current Handoff
 
-- Generated: 2026-05-28 (batch 4)
-- Task: batch promote 7 AI 工具 stubs, implement promote-ready --apply
-- Next: inject-pending --apply, canonical cleanup, CI gates
+- Generated: 2026-05-28 (batch 5)
+- Task: inject-pending subcommand + --apply
+- Next: canonical cleanup, CI gates, scan aggregator update
 - Current branch during this update: `master`
 
 ## Current State Summary
 
-Wiki maintenance v2 apply-phase has begun. `promote-ready --apply` is now live. The remaining apply-style workflows (inject-pending --apply) are still not implemented.
+All major apply-style subcommands implemented. Remaining work: canonical cleanup, CI gates, scan aggregator update for inject-pending.
 
 Available subcommands in `tools/wiki_maintain.py`:
 
@@ -23,8 +23,14 @@ Available subcommands in `tools/wiki_maintain.py`:
 - `author-fix` — repair bare-string `作者` fields into canonical list format
 - `bare-link-fix` — convert ambiguous bare `[[wikilinks]]` to explicit relative links in index files
 - `pending-match` — compare external pending digest URLs against wiki page URLs
+- `inject-pending` — inject content from pending digest files into matching wiki stubs (`--apply`, `--limit N`, `--pending-dir PATH`)
 - `promote-ready` — list or apply promotion of non-LingOrm stubs (`--apply`, `--limit N`)
 - `audit-list` — list open items from the audit/ directory
+
+## Batch 5 Completions
+
+- **`inject-pending` subcommand implemented** (commit `bb61a7b`): report + `--apply` + `--limit N`. New code: `_INJECT_STUB_MARKERS`, `_INJECT_LEVEL2_RE`, `_determine_inject_status`, `InjectPendingEntry`, `InjectPendingResult`, `collect_inject_pending`, `render_inject_pending_report`, `unique_inject_pending_report_path`, `apply_inject_pending`, `command_inject_pending`. Requires `--pending-dir PATH` (no hardcoded paths). LingOrm always skipped. Appends log.md on apply.
+- **Verification**: `inject-pending --help` ✓, nonexistent-dir error ✓, 0-eligible dry run ✓, `promote-ready` 0 ✓, `index-lint` 0 ✓
 
 ## Batch 4 Completions
 
@@ -154,11 +160,11 @@ Files outside the monitored set (`raw/`, `.obsidian/`, `wiki-pages/`, etc.) are 
 
 Still not completed:
 
-- `inject-pending` (subcommand exists as report-only; `--apply` not implemented)
-- `inject-pending --apply` — apply-style batch ingest from pending digest
-- canonical cleanup automation
+- canonical cleanup automation (`canonical-guard` reports conflicts but no auto-fix)
 - delegate integration
 - CI/report cleanliness gates
+- `scan` aggregator: `inject-pending` not yet wired into scan (requires `--pending-dir` which scan doesn't have)
+- README/tool docs for apply commands
 - README/tool docs for apply commands
 
 ### Known remaining issues
@@ -168,13 +174,13 @@ Still not completed:
 
 ## Explicit Next Step
 
-`promote-ready --apply` is live. All 7 qualified AI 工具 stubs promoted. Next priorities:
+`inject-pending --apply` is live (commit `bb61a7b`). All major apply subcommands done. Next priorities:
 
-1. **`inject-pending --apply`** — implement apply-style batch ingest. Spec mirrors `promote-ready --apply`: default dry-run, `--apply` flag required to write, `--limit N` to cap batch size.
-2. **Canonical cleanup** — `canonical-guard` still reports conflicts; implement auto-fix or guided workflow.
-3. **CI gates** — add report-cleanliness checks to prevent regressions.
+1. **Canonical cleanup** — `canonical-guard` still reports conflicts; implement auto-fix or guided workflow.
+2. **CI gates** — add report-cleanliness checks to prevent regressions.
+3. **`scan` aggregator** — wire `inject-pending` into scan (needs optional `--pending-dir`).
 
-Dashboard is current. No pending promote queue.
+Dashboard current. No pending promote queue. To use inject-pending in practice: `python tools/wiki_maintain.py inject-pending --pending-dir <path> [--apply] [--limit N]`.
 
 ## Do Not Touch
 
