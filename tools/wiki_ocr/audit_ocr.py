@@ -20,6 +20,7 @@ from _image_ocr import (
 
 OBSIDIAN_URI_RE = re.compile(r"obsidian://open\?vault=knowledge-wiki&file=([^)]+)")
 URL_RE = re.compile(r"^網址:\s*(.+)$", re.MULTILINE)
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_audit_report(path: Path) -> tuple[str, list[dict]]:
@@ -82,7 +83,7 @@ def extract_wiki_path(page_cell: str) -> Path | None:
     if not m:
         return None
     decoded = unquote(m.group(1))
-    return Path("wiki-pages") / (decoded + ".md")
+    return _REPO_ROOT / "wiki-pages" / (decoded + ".md")
 
 
 def extract_threads_url(wiki_path: Path) -> str | None:
