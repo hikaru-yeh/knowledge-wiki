@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import re
 import sys
+from datetime import date
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -21,6 +23,35 @@ from _image_ocr import (
 OBSIDIAN_URI_RE = re.compile(r"obsidian://open\?vault=knowledge-wiki&file=([^)]+)")
 URL_RE = re.compile(r"^網址:\s*(.+)$", re.MULTILINE)
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPORT_DIR = _REPO_ROOT / "tasks" / "maintenance-reports"
+
+
+def unique_ocr_report_path(report_dir: Path, report_date: str) -> Path:
+    first = report_dir / f"ocr-{report_date}.md"
+    if not first.exists():
+        return first
+    for idx in range(2, 1000):
+        path = report_dir / f"ocr-{report_date}-{idx}.md"
+        if not path.exists():
+            return path
+    raise RuntimeError(f"too many OCR reports already exist for {report_date}")
+
+
+class TeeOutput:
+    """Write to stdout and optionally capture to buffer for report file."""
+
+    def __init__(self, capture: bool = False) -> None:
+        self._buf = io.StringIO() if capture else None
+
+    def print(self, *args: object, **kwargs: object) -> None:
+        print(*args, **kwargs)  # type: ignore[arg-type]
+        if self._buf is not None:
+            kwargs_copy = dict(kwargs)
+            kwargs_copy["file"] = self._buf
+            print(*args, **kwargs_copy)  # type: ignore[arg-type]
+
+    def get_text(self) -> str:
+        return self._buf.getvalue() if self._buf else ""
 
 
 def parse_audit_report(path: Path) -> tuple[str, list[dict]]:
@@ -123,12 +154,12 @@ def build_work_items(targets: list[dict]) -> list[dict]:
     return items
 
 
-def dry_run(audit_path: Path, fmt: str, work_items: list[dict]) -> int:
-    print("== DRY RUN ==")
-    print(f"audit format: {'B (new)' if fmt == 'B' else 'A (legacy)'}")
-    print(f"audit file: {audit_path}")
-    print(f"targets found: {len(work_items)}")
-    print()
+def dry_run(audit_path: Path, fmt: str, work_items: list[dict], *, tee: TeeOutput) -> int:
+    tee.print("== DRY RUN ==")
+    tee.print(f"audit format: {'B (new)' if fmt == 'B' else 'A (legacy)'}")
+    tee.print(f"audit file: {audit_path}")
+    tee.print(f"targets found: {len(work_items)}")
+    tee.print()
 
     existing_count = 0
     for i, item in enumerate(work_items, 1):
@@ -138,19 +169,19 @@ def dry_run(audit_path: Path, fmt: str, work_items: list[dict]) -> int:
         if has_existing:
             existing_count += 1
 
-        print(f"[{i}] {wp}")
-        print(f"    threads URL: {url or '(none)'}")
-        print(f"    status: would fetch images + OCR + apply ## 圖片文字")
-        print(f"    has existing ## 圖片文字: {'Yes' if has_existing else 'No'}")
-        print()
+        tee.print(f"[{i}] {wp}")
+        tee.print(f"    threads URL: {url or '(none)'}")
+        tee.print(f"    status: would fetch images + OCR + apply ## 圖片文字")
+        tee.print(f"    has existing ## 圖片文字: {'Yes' if has_existing else 'No'}")
+        tee.print()
 
-    print(f"summary: {len(work_items)} targets | {existing_count} with existing OCR | run with --apply to execute")
+    tee.print(f"summary: {len(work_items)} targets | {existing_count} with existing OCR | run with --apply to execute")
     return 0
 
 
 def apply_mode(work_items: list[dict], *, api_key: str, model: str,
-               headless: bool, skip_existing: bool) -> int:
-    print("== APPLY ==")
+               headless: bool, skip_existing: bool, tee: TeeOutput) -> int:
+    tee.print("== APPLY ==")
     ocr_image = build_ocr_image(api_key=api_key, model=model)
     total = len(work_items)
     ocrd = 0
@@ -159,50 +190,53 @@ def apply_mode(work_items: list[dict], *, api_key: str, model: str,
 
     for i, item in enumerate(work_items, 1):
         wp = item["wiki_path"]
-        print(f"[{i}/{total}] processing {wp}")
+        tee.print(f"[{i}/{total}] processing {wp}")
 
         if not wp.exists():
-            print(f"      SKIP: file not found")
+            tee.print(f"      SKIP: file not found")
             skipped += 1
             continue
 
         if skip_existing and has_ocr_section(wp):
-            print(f"      SKIP: already has ## 圖片文字")
+            tee.print(f"      SKIP: already has ## 圖片文字")
             skipped += 1
             continue
 
         url = extract_threads_url(wp)
         if not url:
+            tee.print(f"      SKIP: no 網址 in frontmatter")
             print(f"      SKIP: no 網址 in frontmatter", file=sys.stderr)
             skipped += 1
             continue
-        print(f"      threads URL: {url}")
+        tee.print(f"      threads URL: {url}")
 
         try:
             ocr_texts = ocr_post_images(post_url=url, ocr_image=ocr_image, headless=headless)
         except Exception as exc:
+            tee.print(f"      ERROR: {exc}")
             print(f"      ERROR: {exc}", file=sys.stderr)
             errors += 1
             continue
 
         if not ocr_texts:
-            print(f"      SKIP: no images found (may be text-only — flag for review)")
+            tee.print(f"      SKIP: no images found (may be text-only — flag for review)")
             skipped += 1
             continue
 
-        print(f"      fetched + OCR'd {len(ocr_texts)} images")
+        tee.print(f"      fetched + OCR'd {len(ocr_texts)} images")
 
         try:
             apply_ocr_section(wp, ocr_texts)
             total_chars = sum(len(t) for t in ocr_texts)
-            print(f"      wrote ## 圖片文字 section ({total_chars} chars)")
+            tee.print(f"      wrote ## 圖片文字 section ({total_chars} chars)")
             ocrd += 1
         except Exception as exc:
+            tee.print(f"      ERROR writing: {exc}")
             print(f"      ERROR writing: {exc}", file=sys.stderr)
             errors += 1
 
-    print()
-    print(f"summary: targets={total} | ocr'd={ocrd} | skipped={skipped} | errors={errors}")
+    tee.print()
+    tee.print(f"summary: targets={total} | ocr'd={ocrd} | skipped={skipped} | errors={errors}")
     return 1 if errors else 0
 
 
@@ -217,6 +251,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--headed", action="store_true", help="run Playwright with visible browser")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Gemini model name")
     parser.add_argument("--skip-existing", action="store_true", help="skip pages with existing ## 圖片文字")
+    parser.add_argument("--report", action="store_true", help="write output to tasks/maintenance-reports/ocr-YYYY-MM-DD.md")
     return parser.parse_args(argv)
 
 
@@ -237,21 +272,31 @@ def main(argv: list[str] | None = None) -> int:
     if args.limit > 0:
         work_items = work_items[: args.limit]
 
+    tee = TeeOutput(capture=args.report)
+
     if not args.apply:
-        return dry_run(audit_path, fmt, work_items)
+        rc = dry_run(audit_path, fmt, work_items, tee=tee)
+    else:
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        if not api_key:
+            print("ERROR: GEMINI_API_KEY not found. Set in .env or environment.", file=sys.stderr)
+            return 1
+        rc = apply_mode(
+            work_items,
+            api_key=api_key,
+            model=args.model,
+            headless=not args.headed,
+            skip_existing=args.skip_existing,
+            tee=tee,
+        )
 
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    if not api_key:
-        print("ERROR: GEMINI_API_KEY not found. Set in .env or environment.", file=sys.stderr)
-        return 1
+    if args.report:
+        _REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        report_path = unique_ocr_report_path(_REPORT_DIR, date.today().isoformat())
+        report_path.write_text(tee.get_text(), encoding="utf-8")
+        print(f"report written: {report_path}")
 
-    return apply_mode(
-        work_items,
-        api_key=api_key,
-        model=args.model,
-        headless=not args.headed,
-        skip_existing=args.skip_existing,
-    )
+    return rc
 
 
 if __name__ == "__main__":

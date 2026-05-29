@@ -157,9 +157,12 @@ python tools\wiki_ocr\audit_ocr.py tasks\content-quality-audit.md
 
 # apply: fetch images, OCR, write to wiki pages
 python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --apply --limit 3
+
+# write report to tasks/maintenance-reports/ocr-YYYY-MM-DD.md
+python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --report
 ```
 
-The tool supports two audit report formats (legacy free-text and standardized `ocr-images` token). It requires `GEMINI_API_KEY` in `.env` and Playwright for browser-based image extraction. Key components (`_gemini_client.py`, `_image_ocr.py`) are pruned clones from the companion `crawl-the-threads` pipeline, keeping only the Gemini OCR path.
+The tool supports two audit report formats (legacy free-text and standardized `ocr-images` token). It requires `GEMINI_API_KEY` in `.env` and Playwright for browser-based image extraction. The `--report` flag writes output to `tasks/maintenance-reports/ocr-YYYY-MM-DD[-N].md` using the same naming convention as `wiki_maintain.py` subcommands. Key components (`_gemini_client.py`, `_image_ocr.py`) are pruned clones from the companion `crawl-the-threads` pipeline, keeping only the Gemini OCR path.
 
 ### Current frontmatter constraints
 

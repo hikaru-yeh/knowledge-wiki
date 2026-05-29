@@ -155,9 +155,12 @@ python tools\wiki_ocr\audit_ocr.py tasks\content-quality-audit.md
 
 # 套用模式：擷取圖片、OCR、寫入 wiki 頁面
 python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --apply --limit 3
+
+# 將輸出寫入 tasks/maintenance-reports/ocr-YYYY-MM-DD.md
+python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --report
 ```
 
-這個工具支援兩種稽核報告格式（舊版自由文字與標準化 `ocr-images` token）。需要 `.env` 中的 `GEMINI_API_KEY` 以及 Playwright 來擷取瀏覽器中的圖片。核心元件（`_gemini_client.py`、`_image_ocr.py`）是從 `crawl-the-threads` 管線精簡克隆而來，只保留 Gemini OCR 路徑。
+這個工具支援兩種稽核報告格式（舊版自由文字與標準化 `ocr-images` token）。需要 `.env` 中的 `GEMINI_API_KEY` 以及 Playwright 來擷取瀏覽器中的圖片。`--report` 旗標會將輸出寫入 `tasks/maintenance-reports/ocr-YYYY-MM-DD[-N].md`，採用與 `wiki_maintain.py` subcommand 相同的命名慣例。核心元件（`_gemini_client.py`、`_image_ocr.py`）是從 `crawl-the-threads` 管線精簡克隆而來，只保留 Gemini OCR 路徑。
 
 ### 目前 frontmatter 限制
 
