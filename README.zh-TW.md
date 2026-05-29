@@ -28,7 +28,11 @@ knowledge-wiki/
 │   └── maintenance-reports/         # 產生本地報告的佔位資料夾
 ├── tools/                           # Repository 專用維護腳本
 │   ├── sync_public_agents.py        # 從私人 CLAUDE.md 重新產生公開版 AGENTS.md
-│   └── wiki_maintain.py
+│   ├── wiki_maintain.py
+│   └── wiki_ocr/                    # 獨立的稽核驅動 OCR 擷取工具
+│       ├── _gemini_client.py        # Gemini API 包裝器（從 crawl-the-threads 克隆）
+│       ├── _image_ocr.py            # 圖片 OCR 管線（僅 Gemini，精簡克隆）
+│       └── audit_ocr.py             # CLI：讀取稽核報告 → 擷取圖片 → OCR → 套用
 └── wiki-pages/                      # 由 LLM 維護的結構化知識頁面
     ├── README.md
     ├── index/                       # 範例索引結構
@@ -87,16 +91,17 @@ python tools\wiki_maintain.py <subcommand> [options]
 - raw-to-wiki coverage 報告
 - duplicate URL 偵測
 - canonical guard：偵測過期檔案與作者 frontmatter 規則違反
+- 一鍵 `scan` aggregator
+- pending raw-to-wiki matching（`pending-match`）與 digest injection（`inject-pending --apply`）
+- promote（`promote-ready --apply`）與作者欄位修復（`author-fix`）的安全 apply 流程
+- audit-list generation（`audit-list`）
+- CI gate（`tools/validate-wiki.ps1`）：發布前強制 0 errors
+- 獨立的稽核驅動 OCR 擷取工具（`tools/wiki_ocr/`）
 
 尚未完成：
 
-- 一鍵 `scan` aggregator
-- pending raw-to-wiki matching 與 digest injection
-- promote / ingest / index repair 的安全 apply 流程
 - canonical cleanup automation
-- audit-list generation
 - 多 agent 維護批次的 delegate integration
-- 發布前檢查 report cleanliness 的 CI gates
 
 ### 常用指令
 
@@ -138,6 +143,21 @@ python tools\sync_public_agents.py --source-ref master --check
 | `coverage` | 找出尚未匯入 wiki 的 raw source pages | 搭配 `--report` 時可選擇寫入 | `tasks/maintenance-reports/ingest-candidates-YYYY-MM-DD*.md` | 否 |
 | `duplicates` | 偵測重複的 frontmatter URL，並建議 canonical | 搭配 `--report` 時可選擇寫入 | `tasks/maintenance-reports/duplicates-YYYY-MM-DD*.md` | 否 |
 | `canonical-guard` | 偵測過期的 canonical 衝突與 frontmatter 作者規則違反 | 搭配 `--report` 時可選擇寫入 | `tasks/maintenance-reports/canonical-guard-YYYY-MM-DD*.md` | 否 |
+
+### OCR 擷取工具
+
+`tools/wiki_ocr/` 底下的獨立 CLI，可讀取內容稽核報告，找出標記需要 OCR 的 wiki 頁面，透過 Playwright 擷取原始 Threads 貼文圖片，再經由 Gemini 進行 OCR，最後將 `## 圖片文字` 區塊附加到 wiki 頁面。
+
+```powershell
+# 乾跑模式：列出目標，不呼叫 API 也不寫入
+python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md
+python tools\wiki_ocr\audit_ocr.py tasks\content-quality-audit.md
+
+# 套用模式：擷取圖片、OCR、寫入 wiki 頁面
+python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --apply --limit 3
+```
+
+這個工具支援兩種稽核報告格式（舊版自由文字與標準化 `ocr-images` token）。需要 `.env` 中的 `GEMINI_API_KEY` 以及 Playwright 來擷取瀏覽器中的圖片。核心元件（`_gemini_client.py`、`_image_ocr.py`）是從 `crawl-the-threads` 管線精簡克隆而來，只保留 Gemini OCR 路徑。
 
 ### 目前 frontmatter 限制
 

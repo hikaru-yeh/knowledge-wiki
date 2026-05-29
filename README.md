@@ -28,7 +28,11 @@ knowledge-wiki/
 │   └── maintenance-reports/         # Placeholder for generated local reports
 ├── tools/                           # Repo-specific maintenance scripts
 │   ├── sync_public_agents.py        # Regenerate public AGENTS.md from private CLAUDE.md
-│   └── wiki_maintain.py
+│   ├── wiki_maintain.py
+│   └── wiki_ocr/                    # Standalone audit-driven OCR fetch tool
+│       ├── _gemini_client.py        # Gemini API wrapper (cloned from crawl-the-threads)
+│       ├── _image_ocr.py            # Image OCR pipeline (Gemini-only, pruned clone)
+│       └── audit_ocr.py             # CLI: read audit reports → fetch images → OCR → apply
 └── wiki-pages/                      # LLM-maintained structured knowledge pages
     ├── README.md
     ├── index/                       # Example index structure
@@ -89,16 +93,17 @@ Implemented:
 - raw-to-wiki coverage reporting
 - duplicate URL detection
 - canonical guard checks for stale files and author frontmatter rules
+- one-command `scan` aggregator
+- pending raw-to-wiki matching (`pending-match`) and digest injection (`inject-pending --apply`)
+- safe apply flows for promote (`promote-ready --apply`) and author field repair (`author-fix`)
+- audit-list generation (`audit-list`)
+- CI gate (`tools/validate-wiki.ps1`) that enforces 0 errors before publishing
+- standalone audit-driven OCR fetch tool (`tools/wiki_ocr/`)
 
 Not implemented yet:
 
-- one-command `scan` aggregator
-- pending raw-to-wiki matching and digest injection
-- safe apply flows for promote / ingest / index repair
 - canonical cleanup automation
-- audit-list generation
 - delegate integration for multi-agent maintenance batches
-- CI gates that enforce report cleanliness before publishing
 
 ### Common commands
 
@@ -140,6 +145,21 @@ The sync script removes private category/project-only rules and keeps paths rela
 | `coverage` | Find raw source pages not yet ingested into the wiki | Optional with `--report` | `tasks/maintenance-reports/ingest-candidates-YYYY-MM-DD*.md` | No |
 | `duplicates` | Detect duplicate frontmatter URLs and suggest canonicals | Optional with `--report` | `tasks/maintenance-reports/duplicates-YYYY-MM-DD*.md` | No |
 | `canonical-guard` | Detect stale canonical conflicts and frontmatter author rule violations | Optional with `--report` | `tasks/maintenance-reports/canonical-guard-YYYY-MM-DD*.md` | No |
+
+### OCR fetch tool
+
+A standalone CLI under `tools/wiki_ocr/` that reads content audit reports, finds wiki pages marked for OCR, fetches their original Threads post images via Playwright, OCRs them through Gemini, and appends a `## 圖片文字` section to the wiki page.
+
+```powershell
+# dry-run: lists targets without making API calls or writes
+python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md
+python tools\wiki_ocr\audit_ocr.py tasks\content-quality-audit.md
+
+# apply: fetch images, OCR, write to wiki pages
+python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --apply --limit 3
+```
+
+The tool supports two audit report formats (legacy free-text and standardized `ocr-images` token). It requires `GEMINI_API_KEY` in `.env` and Playwright for browser-based image extraction. Key components (`_gemini_client.py`, `_image_ocr.py`) are pruned clones from the companion `crawl-the-threads` pipeline, keeping only the Gemini OCR path.
 
 ### Current frontmatter constraints
 
