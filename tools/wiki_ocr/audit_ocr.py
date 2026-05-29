@@ -40,16 +40,22 @@ def parse_audit_report(path: Path) -> tuple[str, list[dict]]:
 
         if not in_table:
             headers = cells
-            if fmt is None:
-                fmt = "B" if "signals" in cells else "A"
+            # Only detect format from data tables (those with 頁面 column)
+            if "頁面" in cells:
+                detected = "B" if "signals" in cells else "A"
+                # Once we see Format B, never downgrade to A
+                if fmt is None or detected == "B":
+                    fmt = detected
             in_table = True
             continue
 
         if all(set(c) <= {"-", ":", " "} for c in cells):
             continue
 
-        row = dict(zip(headers, cells))
-        all_rows.append(row)
+        # Only collect rows from data tables (those with 頁面 in headers)
+        if "頁面" in headers:
+            row = dict(zip(headers, cells))
+            all_rows.append(row)
 
     return fmt or "A", all_rows
 
