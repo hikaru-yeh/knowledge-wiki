@@ -13,7 +13,7 @@ This project organizes raw saved material into durable, cross-linked wiki pages.
 - A workflow for turning messy saved posts, references, project notes, and imported documents into structured Markdown knowledge.
 - Index maintenance rules, page status conventions, and workflow knowledge patterns.
 - A repository shape that can be reused for Obsidian, Claude Code, Codex, or other LLM-assisted writing workflows.
-- A lightweight maintenance tool layer for reporting wiki health, blocked pages, duplicate URLs, and ingest coverage before any apply workflow is allowed.
+- A maintenance tool layer with 20 subcommands for reporting wiki health, linting cross-references, auditing content readability, and applying safe batch fixes.
 
 ## Repository Structure
 
@@ -21,17 +21,22 @@ This project organizes raw saved material into durable, cross-linked wiki pages.
 knowledge-wiki/
 ├── AGENTS.md
 ├── AGENTS_en.md
+├── audit/
+│   └── example-reports/             # Sanitized example outputs from each tool
 ├── raw/                             # User-managed source material, treated as read-only
 │   ├── README.md
 │   └── examples/                    # Synthetic publishable source examples
 ├── tasks/
 │   └── maintenance-reports/         # Placeholder for generated local reports
 ├── tools/                           # Repo-specific maintenance scripts
+│   ├── wiki_maintain.py             # Main CLI: 20 subcommands for scan/lint/fix
+│   ├── validate-wiki.ps1            # CI gate: parses scan output, fails on errors
+│   ├── gen_content_audit.py         # One-shot content quality triage tool
+│   ├── fill_threads_stub_pages.py   # Batch-create stub pages from raw/threads
 │   ├── sync_public_agents.py        # Regenerate public AGENTS.md from private CLAUDE.md
-│   ├── wiki_maintain.py
 │   └── wiki_ocr/                    # Standalone audit-driven OCR fetch tool
-│       ├── _gemini_client.py        # Gemini API wrapper (cloned from crawl-the-threads)
-│       ├── _image_ocr.py            # Image OCR pipeline (Gemini-only, pruned clone)
+│       ├── _gemini_client.py        # Gemini API wrapper
+│       ├── _image_ocr.py            # Image OCR pipeline (Gemini-only)
 │       └── audit_ocr.py             # CLI: read audit reports → fetch images → OCR → apply
 └── wiki-pages/                      # LLM-maintained structured knowledge pages
     ├── README.md
@@ -56,20 +61,22 @@ Typical operations:
 - **Query**: Answer questions from the curated wiki and report knowledge gaps.
 - **Lint**: Check for broken links, stale references, duplicate URLs, blocked pages, weak summaries, and inconsistent frontmatter metadata.
 
+---
+
 ## Maintenance Tooling
 
-The repository includes a repo-specific report-first maintenance CLI:
+The repository includes a report-first maintenance CLI with 20 subcommands:
 
 ```powershell
 python tools\wiki_maintain.py <subcommand> [options]
 ```
 
-Current rule of thumb:
+Design principles:
 
-- `raw/` is read-only.
-- Current tooling is primarily report-only.
-- Use reports to decide the next bounded cleanup batch.
-- Do not run apply-style maintenance blindly from tooling.
+- `raw/` is read-only — no tool ever writes to it.
+- Report-only by default. Destructive commands require explicit `--apply`.
+- Reports drive bounded cleanup batches — never run apply blindly.
+- LingOrm stubs are excluded from promote/error checks by policy.
 
 ### Maintenance architecture status
 
@@ -78,113 +85,420 @@ The maintenance architecture is inspired by:
 - [`kfchou/wiki-skills`](https://github.com/kfchou/wiki-skills)
 - [`lewislulu/llm-wiki-skill`](https://github.com/lewislulu/llm-wiki-skill)
 
-The implementation is still a work in progress. The current public scaffold
-shows the **report-first maintenance layer**, not a fully automated wiki
-rewriter.
-
-Implemented:
+**Implemented (Phase 1–4):**
 
 - public/private agent instruction sync: `AGENTS.md` and `AGENTS_en.md`
 - session handoff report generation
 - blocked content gap reporting
-- status/frontmatter auditing
-- index linting
+- status/frontmatter auditing and author field repair (`author-fix --apply`)
+- index linting with bare-link auto-fix (`bare-link-fix --apply`)
+- cross-reference linting: broken wikilinks, orphan pages, broken xref sections (`xref-lint`)
+- readability linting: detect undigested wiki pages (`readability-lint`)
+- tags auditing: missing/empty tags, singleton tags, frequency stats (`tags-lint`)
 - review finding reconciliation
 - raw-to-wiki coverage reporting
 - duplicate URL detection
 - canonical guard checks for stale files and author frontmatter rules
-- one-command `scan` aggregator
+- one-command `scan` aggregator (runs all checks)
 - pending raw-to-wiki matching (`pending-match`) and digest injection (`inject-pending --apply`)
-- safe apply flows for promote (`promote-ready --apply`) and author field repair (`author-fix`)
-- audit-list generation (`audit-list`)
-- CI gate (`tools/validate-wiki.ps1`) that enforces 0 errors before publishing
+- safe promote flow (`promote-ready --apply`)
+- audit inbox lifecycle (`audit-list`, `audit-resolve --apply`)
+- CI gate (`tools/validate-wiki.ps1`) — enforces 0 errors before publishing
+- content quality triage tool (`tools/gen_content_audit.py`)
 - standalone audit-driven OCR fetch tool (`tools/wiki_ocr/`)
+- `wiki-maintenance` Claude Code skill for guided batch maintenance
 
-Not implemented yet:
+**Not implemented yet:**
 
 - canonical cleanup automation
-- delegate integration for multi-agent maintenance batches
+- delegate integration for multi-agent maintenance batches (Phase 4.5)
+- Obsidian/Web feedback UI (Phase 5)
+
+---
+
+### Quick start
+
+```powershell
+# Full scan — runs all checks, writes markdown report
+python tools\wiki_maintain.py scan --report
+
+# CI gate — exits 1 if any errors found
+pwsh tools\validate-wiki.ps1
+
+# Session handoff for next agent
+python tools\wiki_maintain.py handoff --task "batch-name" --next "next-step"
+```
 
 ### Common commands
 
 ```powershell
+# Scan & report (aggregates all checks)
+python tools\wiki_maintain.py scan --report
+
+# Individual lint checks
 python tools\wiki_maintain.py status-audit --report
-python tools\wiki_maintain.py canonical-guard --report
 python tools\wiki_maintain.py index-lint --report
+python tools\wiki_maintain.py xref-lint --report
+python tools\wiki_maintain.py readability-lint --report
+python tools\wiki_maintain.py tags-lint --report
+python tools\wiki_maintain.py canonical-guard --report
 python tools\wiki_maintain.py coverage --report
 python tools\wiki_maintain.py duplicates --report
+
+# Apply-style commands (require --apply flag)
+python tools\wiki_maintain.py promote-ready --apply --limit 10
+python tools\wiki_maintain.py author-fix --apply
+python tools\wiki_maintain.py bare-link-fix --apply
+python tools\wiki_maintain.py audit-resolve content-audit-2026-05-29.md --apply --summary "Done"
+
+# Operational
 python tools\wiki_maintain.py blocked-report
+python tools\wiki_maintain.py audit-list --include-resolved
 python tools\wiki_maintain.py handoff --task "batch-name" --next "next-step"
 ```
 
-### Public agent instructions sync
-
-The public branch keeps `AGENTS.md` as the sanitized version of the private working-vault `CLAUDE.md`, with `AGENTS_en.md` as the English companion. After changing `CLAUDE.md` on the private branch, regenerate both public instruction files from the public branch:
-
-```powershell
-python tools\sync_public_agents.py --source-ref master
-```
-
-To check whether either `AGENTS.md` or `AGENTS_en.md` is out of sync without writing:
-
-```powershell
-python tools\sync_public_agents.py --source-ref master --check
-```
-
-The sync script removes private category/project-only rules and keeps paths relative for public display. If `AGENTS.md` changes, `AGENTS_en.md` must be updated in the same commit.
+---
 
 ### Subcommand reference
 
-| Subcommand | Main purpose | Writes report/file | Output path | Changes `wiki-pages/` |
+| Subcommand | Type | Severity | Purpose | Output |
 |---|---|---|---|---|
-| `handoff` | Capture current session state for the next agent/session | Yes | `tasks/current-handoff.md` | No |
-| `blocked-report` | List blocked pages that should not be promoted yet | Yes | `tasks/blocked-content-gaps.md` | No |
-| `status-audit` | Audit `status` frontmatter and frontmatter schema issues | Optional with `--report` | `tasks/maintenance-reports/status-audit-YYYY-MM-DD*.md` | No |
-| `index-lint` | Check index links, ambiguous bare links, missing targets, and stub marker mismatches | Optional with `--report` | `tasks/maintenance-reports/index-lint-YYYY-MM-DD*.md` | No |
-| `review-reconcile` | Bucket review findings into cleanup-caused / deferred / pre-existing / environmental / dismissed | Yes | `tasks/maintenance-reports/review-reconcile-YYYY-MM-DD*.md` | No |
-| `coverage` | Find raw source pages not yet ingested into the wiki | Optional with `--report` | `tasks/maintenance-reports/ingest-candidates-YYYY-MM-DD*.md` | No |
-| `duplicates` | Detect duplicate frontmatter URLs and suggest canonicals | Optional with `--report` | `tasks/maintenance-reports/duplicates-YYYY-MM-DD*.md` | No |
-| `canonical-guard` | Detect stale canonical conflicts and frontmatter author rule violations | Optional with `--report` | `tasks/maintenance-reports/canonical-guard-YYYY-MM-DD*.md` | No |
+| `scan` | report | — | Aggregate all report-only checks into one report | `audit/maintenance-reports/maintenance-report-YYYY-MM-DD*.md` |
+| `status-audit` | report | error | Detect missing/unknown `status`, author format violations | `audit/maintenance-reports/status-audit-YYYY-MM-DD*.md` |
+| `index-lint` | report | error/warn | Check index links, stub markers, summary quality | `audit/maintenance-reports/index-lint-YYYY-MM-DD*.md` |
+| `xref-lint` | report | warn/info | Broken wikilinks, orphan pages, broken xref sections, missing xref sections | `audit/maintenance-reports/xref-lint-YYYY-MM-DD*.md` |
+| `readability-lint` | report | info | Detect undigested `status: wiki` pages (4 signal types) | `audit/maintenance-reports/readability-lint-YYYY-MM-DD*.md` |
+| `tags-lint` | report | info | Audit `tags:` field: missing, empty, singleton tags; frequency stats | `audit/maintenance-reports/tags-lint-YYYY-MM-DD*.md` |
+| `canonical-guard` | report | error | Detect stale canonical conflicts and author frontmatter violations | `audit/maintenance-reports/canonical-guard-YYYY-MM-DD*.md` |
+| `coverage` | report | info | Find raw sources not yet ingested into wiki | `audit/maintenance-reports/ingest-candidates-YYYY-MM-DD*.md` |
+| `duplicates` | report | error | Detect duplicate frontmatter URLs, suggest canonicals | `audit/maintenance-reports/duplicates-YYYY-MM-DD*.md` |
+| `review-reconcile` | report | — | Bucket review findings into reconciliation categories | `audit/maintenance-reports/review-reconcile-YYYY-MM-DD*.md` |
+| `blocked-report` | write | — | List pages that cannot be auto-promoted | `tasks/blocked-content-gaps.md` |
+| `handoff` | write | — | Capture session state for next agent/session | `tasks/current-handoff.md` |
+| `audit-list` | report | — | List open audit items; `--include-resolved` shows resolved count | stdout |
+| `audit-resolve` | apply | — | Resolve audit item: move to `audit/resolved/`, append resolution | `audit/resolved/*.md` |
+| `author-fix` | apply | — | Fix bare-string `作者` to canonical `["@handle"]` format | in-place wiki files |
+| `bare-link-fix` | apply | — | Convert ambiguous bare `[[wikilinks]]` to explicit relative links | in-place index files |
+| `pending-match` | report | — | Match external pending digest URLs against wiki URLs | stdout |
+| `inject-pending` | apply | — | Inject pending digest content into matched wiki stubs | in-place wiki files |
+| `promote-ready` | apply | — | Promote non-LingOrm stubs with sufficient content to `status: wiki` | in-place wiki files |
 
-### OCR fetch tool
+All report subcommands support `--report` to write a dated markdown file. All apply subcommands default to dry-run and require `--apply` to write.
 
-A standalone CLI under `tools/wiki_ocr/` that reads content audit reports, finds wiki pages marked for OCR, fetches their original Threads post images via Playwright, OCRs them through Gemini, and appends a `## 圖片文字` section to the wiki page.
+---
+
+### Tool usage & agent prompts
+
+#### `xref-lint` — Cross-reference linting
+
+Scans all non-index wiki pages for broken `[[wikilinks]]`, orphan pages (not referenced by any page or index), and broken links inside `## Cross References` sections.
 
 ```powershell
-# dry-run: lists targets without making API calls or writes
-python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md
-python tools\wiki_ocr\audit_ocr.py tasks\content-quality-audit.md
+# Console output
+python tools\wiki_maintain.py xref-lint
 
-# apply: fetch images, OCR, write to wiki pages
+# Write dated report
+python tools\wiki_maintain.py xref-lint --report
+# → audit/maintenance-reports/xref-lint-YYYY-MM-DD.md
+```
+
+**Agent prompt (pair with report):**
+
+```text
+Read audit/maintenance-reports/xref-lint-YYYY-MM-DD.md and fix all xref issues.
+
+How to handle each issue type:
+- broken-xref-section: Fix broken wikilinks in Cross References blocks — change to correct relative links.
+- broken-wikilink: For log.md historical broken links, remove [[]]; for shell code examples, use backticks; for session-note examples, use plain text.
+- orphan-page: Add the page to the appropriate index.
+- missing-xref-section: Add a ## Cross References section to wiki/reference pages that lack one, with at least 2-3 related page links. If there are many, process the first 20.
+
+After fixing, verify with:
+  python tools/wiki_maintain.py xref-lint
+  pwsh tools/validate-wiki.ps1
+```
+
+See [`audit/example-reports/xref-lint-example.md`](audit/example-reports/xref-lint-example.md) for sample output.
+
+---
+
+#### `readability-lint` — Content readability check
+
+Detects `status: wiki` pages that were never properly structured after ingestion. Four signal types:
+
+| Signal | Meaning |
+|--------|---------|
+| `single-dump` | 0 meaningful headings + no format elements (pure paste) |
+| `no-headings` | <2 meaningful headings + no format elements |
+| `social-tone` | Emoji clusters or short-line social-media bursts |
+| `no-formatting` | Has headings but no bullet lists, code blocks, tables, or blockquotes |
+
+```powershell
+# Console output
+python tools\wiki_maintain.py readability-lint
+
+# Write dated report
+python tools\wiki_maintain.py readability-lint --report
+# → audit/maintenance-reports/readability-lint-YYYY-MM-DD.md
+
+# Included in full scan
+python tools\wiki_maintain.py scan --report
+```
+
+**Agent prompt (pair with report):**
+
+```text
+Read audit/maintenance-reports/readability-lint-YYYY-MM-DD.md and batch-restructure the listed pages.
+
+How to handle each signal:
+- single-dump: Only has ## Main Content with no structure → reorganize into at least 2-3 meaningful H2 headings, add a summary paragraph.
+- no-headings: Has some headings but not enough → add proper section structure.
+- social-tone: Emoji/casual tone → rewrite in formal wiki voice, organize into paragraphs.
+- no-formatting: Has headings but all prose → add bullet lists or tables where appropriate.
+
+Before processing each page, check if the source URL is still accessible (Threads posts may be deleted). If source is gone and content < 300 chars, demote to stub.
+
+Process the first 20 single-dump issues. After each batch, verify:
+  python tools/wiki_maintain.py readability-lint
+Confirm issue count decreases before continuing.
+```
+
+See [`audit/example-reports/readability-lint-example.md`](audit/example-reports/readability-lint-example.md) for sample output.
+
+---
+
+#### `tags-lint` — Tags field auditing
+
+Audits the `tags:` frontmatter field across all non-index wiki pages. Three issue types:
+
+| Issue | Severity | Meaning |
+|-------|----------|---------|
+| `missing-tags-field` | info | wiki/reference page has no `tags:` field at all |
+| `empty-tags` | info | wiki/reference page has `tags: []` |
+| `singleton-tag` | info | Tag appears only once across the entire wiki |
+
+```powershell
+python tools\wiki_maintain.py tags-lint
+python tools\wiki_maintain.py tags-lint --report
+# → audit/maintenance-reports/tags-lint-YYYY-MM-DD.md
+```
+
+**Agent prompt (pair with report):**
+
+```text
+Read audit/maintenance-reports/tags-lint-YYYY-MM-DD.md.
+
+Phase A (low-cost): Add missing tags: field and fill empty tags for wiki/reference pages.
+- Use page category + title + content to suggest 2-4 relevant tags.
+- Prefer existing high-frequency tags from the report's frequency table.
+- Format: tags: [tag1, tag2, tag3]
+
+Process the first 20 missing-tags-field issues. After each batch, verify:
+  python tools/wiki_maintain.py tags-lint
+```
+
+See [`audit/example-reports/tags-lint-example.md`](audit/example-reports/tags-lint-example.md) for sample output.
+
+---
+
+#### `scan` — Full maintenance scan
+
+Runs all report-only checks in a single pass and produces a combined report.
+
+```powershell
+python tools\wiki_maintain.py scan --report
+# → audit/maintenance-reports/maintenance-report-YYYY-MM-DD.md
+
+# With external pending digest directory
+python tools\wiki_maintain.py scan --report --pending-dir "D:\path\to\pending-digest"
+```
+
+The report includes a summary table, per-check details, and a suggested next-agent prompt. The CI gate (`validate-wiki.ps1`) parses the `totals:` line from scan output.
+
+See [`audit/example-reports/scan-report-example.md`](audit/example-reports/scan-report-example.md) for sample output.
+
+---
+
+#### `audit-resolve` — Audit inbox lifecycle
+
+Resolves open audit items by moving them to `audit/resolved/`, rewriting frontmatter, and appending a `# Resolution` section.
+
+```powershell
+# Dry-run (default)
+python tools\wiki_maintain.py audit-resolve content-audit-2026-05-29.md --summary "Batches 1-7 complete"
+
+# Apply
+python tools\wiki_maintain.py audit-resolve content-audit-2026-05-29.md --summary "Batches 1-7 complete" --apply
+
+# List with resolved count
+python tools\wiki_maintain.py audit-list
+python tools\wiki_maintain.py audit-list --include-resolved
+```
+
+---
+
+### CI gate: `validate-wiki.ps1`
+
+A PowerShell wrapper that runs `scan` and exits non-zero if any errors are found.
+
+```powershell
+pwsh tools\validate-wiki.ps1
+
+# With pending directory
+pwsh tools\validate-wiki.ps1 -PendingDir "D:\path\to\pending-digest"
+```
+
+The script parses the `totals: errors=N warnings=M info=P` line from scan output. Exit 0 = PASS (no errors), exit 1 = FAIL.
+
+---
+
+### Content quality triage: `gen_content_audit.py`
+
+A one-shot tool that scans `wiki-pages/` for `status: wiki` or `reference` pages with short bodies (< 500 chars), detects content signals (video, GitHub, CTA, external URLs), and suggests triage actions.
+
+```powershell
+python tools\gen_content_audit.py
+# → audit/content-audit-YYYY-MM-DD.md
+```
+
+**Signal types:** `video`, `github`, `cta`, `ext_url`, `tw_url_only`, `raw_gone`, `lingorm`
+
+**Suggested actions:** `re-ingest`, `ocr-images`, `demote-stub`, `manual-review`
+
+See [`audit/example-reports/content-audit-example.md`](audit/example-reports/content-audit-example.md) for sample output.
+
+---
+
+### Stub page generator: `fill_threads_stub_pages.py`
+
+Batch-creates stub pages from `raw/threads-saved/` source files. Includes author extraction from Threads URLs and OCR sanity checks.
+
+```powershell
+# Dry-run
+python tools\fill_threads_stub_pages.py
+
+# Apply
+python tools\fill_threads_stub_pages.py --apply --limit 10
+```
+
+---
+
+### OCR fetch tool: `wiki_ocr/`
+
+Reads content audit reports, finds wiki pages marked for OCR, fetches their original Threads post images via Playwright, OCRs them through Gemini, and appends a `## 圖片文字` section.
+
+```powershell
+# Dry-run
+python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md
+
+# Apply with limit
 python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --apply --limit 3
 
-# write report to tasks/maintenance-reports/ocr-YYYY-MM-DD.md
+# Write report
 python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --report
 ```
 
-The tool supports two audit report formats (legacy free-text and standardized `ocr-images` token). It requires `GEMINI_API_KEY` in `.env` and Playwright for browser-based image extraction. The `--report` flag writes output to `tasks/maintenance-reports/ocr-YYYY-MM-DD[-N].md` using the same naming convention as `wiki_maintain.py` subcommands. Key components (`_gemini_client.py`, `_image_ocr.py`) are pruned clones from the companion `crawl-the-threads` pipeline, keeping only the Gemini OCR path.
+Requires `GEMINI_API_KEY` in `.env` and Playwright for browser-based image extraction.
+
+---
+
+### Public agent instructions sync
+
+```powershell
+# Regenerate AGENTS.md + AGENTS_en.md from private CLAUDE.md
+python tools\sync_public_agents.py --source-ref master
+
+# Check sync status without writing
+python tools\sync_public_agents.py --source-ref master --check
+```
+
+---
+
+### `wiki-maintenance` skill (Claude Code)
+
+A Claude Code project skill (`.claude/commands/wiki-maintenance.md`) that automates the full maintenance workflow.
+
+**Invoke:**
+
+```text
+/wiki-maintenance
+```
+
+**What it does:**
+
+1. Runs `scan --report` and reads the latest report.
+2. Presents a P0–P3 triage table, asks which priority to handle.
+3. Batch-fixes issues: P0 all / P1 ≤20 / P2 ≤15 per batch.
+4. Runs `pwsh tools/validate-wiki.ps1` after each batch (CI gate).
+5. Updates `tasks/current-handoff.md` when done.
+
+**Triage priority:**
+
+| Priority | Issue types | Action |
+|----------|------------|--------|
+| **P0** | `status-audit` errors, `canonical-guard` conflicts, `duplicates` errors | Fix all immediately |
+| **P1** | `index-lint` warnings, `xref-lint` broken links | Fix this session, ≤20/batch |
+| **P2** | `readability-lint`, `tags-lint`, `xref-lint` orphans/missing-xref | Fix when time allows, ≤15/batch |
+| **P3** | `coverage` ingest candidates, `blocked` records | Report only, no auto-fix |
+
+**Agent prompts for skill:**
+
+```text
+/wiki-maintenance
+```
+
+After triage, specify priority:
+
+```text
+Handle P0 and P1.
+```
+
+Target specific issues:
+
+```text
+/wiki-maintenance
+
+After triage, only fix P2 readability-lint single-dump issues, first 15.
+Run validate-wiki.ps1 then stop.
+```
+
+---
 
 ### Current frontmatter constraints
 
-The maintenance tooling treats frontmatter rules as hard constraints. In particular, the `作者` field is treated as a YAML list field:
+The `作者` field is treated as a YAML list field:
 
 ```yaml
 作者: ["@handle"]
 作者: []
 ```
 
-These are considered invalid and should not be reintroduced by future tooling:
+These are invalid and should not be reintroduced:
 
 ```yaml
 作者: [@handle]
 作者: [handle]
 ```
 
-This rule is surfaced through `status-audit` and `canonical-guard`, and future normalize/rewrite flows are expected to preserve valid list syntax.
+Surfaced through `status-audit` and `canonical-guard`.
+
+---
+
+## Example Reports
+
+The `audit/example-reports/` directory contains sanitized sample outputs from each tool, demonstrating report formats without exposing private wiki content:
+
+| Report | Tool | Shows |
+|--------|------|-------|
+| [`scan-report-example.md`](audit/example-reports/scan-report-example.md) | `scan --report` | Full aggregated maintenance report |
+| [`xref-lint-example.md`](audit/example-reports/xref-lint-example.md) | `xref-lint --report` | Broken wikilinks, orphan pages, xref section issues |
+| [`readability-lint-example.md`](audit/example-reports/readability-lint-example.md) | `readability-lint --report` | Undigested wiki pages with signal breakdown |
+| [`tags-lint-example.md`](audit/example-reports/tags-lint-example.md) | `tags-lint --report` | Missing/empty tags, singleton tags, frequency stats |
+| [`content-audit-example.md`](audit/example-reports/content-audit-example.md) | `gen_content_audit.py` | Content quality triage with signals and actions |
 
 ## Included Maintenance Outputs
 
-In a private working vault, `tasks/` is the operational layer for handoffs, blocked-page reports, promote inventories, and dated scan outputs. The public scaffold keeps only `tasks/maintenance-reports/.gitkeep`; generated reports are intentionally ignored so private maintenance state does not leak into showcase commits.
+In a private working vault, `tasks/` and `audit/` are the operational layers for handoffs, reports, and audit lifecycle. The public scaffold keeps only placeholder directories; generated reports are intentionally ignored so private maintenance state does not leak into showcase commits.
 
 ## Page Statuses
 

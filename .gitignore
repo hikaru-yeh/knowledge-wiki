@@ -56,9 +56,20 @@ tasks/scan_*.py
 tasks/verify_*.py
 tasks/fix_*.py
 
+# Audit example reports (sanitized outputs for public showcase)
+audit/**
+!audit/
+!audit/example-reports/
+!audit/example-reports/**
+
 # Tooling: publish the report-first maintenance CLI; keep private helper scripts out.
 tools/*
 !tools/
 !tools/wiki_maintain.py
-!tools/sync_public_agents.py
+!tools/validate-wiki.ps1
+!tools/gen_content_audit.py
+!tools/fill_threads_stub_pages.py
+!tools/wiki_ocr/
+!tools/wiki_ocr/**
+tools/wiki_ocr/__pycache__/
 tools/sync_public_agents.py

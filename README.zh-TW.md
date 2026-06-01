@@ -13,7 +13,7 @@ Languages: [English](README.md) | [繁體中文](README.zh-TW.md)
 - 將雜亂保存的貼文、參考資料、專案筆記與匯入文件轉成結構化 Markdown 知識的工作流程。
 - 索引維護規則、頁面狀態慣例，以及工作流程知識模式。
 - 可重複用於 Obsidian、Claude Code、Codex 或其他 LLM 輔助寫作流程的 repository 結構。
-- 輕量的維護工具層。它可在任何 apply 工作流程執行前，回報 wiki 健康狀態、受阻頁面、重複 URL 與匯入覆蓋率。
+- 包含 20 個子命令的維護工具層，可回報 wiki 健康狀態、檢查交叉參照、稽核內容可讀性、執行安全的批次修復。
 
 ## Repository 結構
 
@@ -21,17 +21,22 @@ Languages: [English](README.md) | [繁體中文](README.zh-TW.md)
 knowledge-wiki/
 ├── AGENTS.md
 ├── AGENTS_en.md
+├── audit/
+│   └── example-reports/             # 每個工具的清理後範例輸出
 ├── raw/                             # 使用者管理的來源資料，視為唯讀
 │   ├── README.md
 │   └── examples/                    # 合成的可公開來源範例
 ├── tasks/
 │   └── maintenance-reports/         # 產生本地報告的佔位資料夾
 ├── tools/                           # Repository 專用維護腳本
+│   ├── wiki_maintain.py             # 主 CLI：20 個子命令，掃描／檢查／修復
+│   ├── validate-wiki.ps1            # CI gate：解析 scan 輸出，有 error 就失敗
+│   ├── gen_content_audit.py         # 一次性內容品質分流工具
+│   ├── fill_threads_stub_pages.py   # 從 raw/threads 批次建立 stub 頁面
 │   ├── sync_public_agents.py        # 從私人 CLAUDE.md 重新產生公開版 AGENTS.md
-│   ├── wiki_maintain.py
 │   └── wiki_ocr/                    # 獨立的稽核驅動 OCR 擷取工具
-│       ├── _gemini_client.py        # Gemini API 包裝器（從 crawl-the-threads 克隆）
-│       ├── _image_ocr.py            # 圖片 OCR 管線（僅 Gemini，精簡克隆）
+│       ├── _gemini_client.py        # Gemini API 包裝器
+│       ├── _image_ocr.py            # 圖片 OCR 管線（僅 Gemini）
 │       └── audit_ocr.py             # CLI：讀取稽核報告 → 擷取圖片 → OCR → 套用
 └── wiki-pages/                      # 由 LLM 維護的結構化知識頁面
     ├── README.md
@@ -56,115 +61,410 @@ knowledge-wiki/
 - **Query**：根據整理後的 wiki 回答問題，並回報知識缺口。
 - **Lint**：檢查壞掉的連結、過期參考、重複 URL、受阻頁面、薄弱摘要，以及不一致的 frontmatter metadata。
 
+---
+
 ## 維護工具
 
-這個 repository 包含一個專用的「先報告」維護 CLI：
+這個 repository 包含一個「先報告」維護 CLI，共 20 個子命令：
 
 ```powershell
 python tools\wiki_maintain.py <subcommand> [options]
 ```
 
-目前的經驗規則：
+設計原則：
 
-- `raw/` 是唯讀。
-- 目前工具主要只用於報告。
-- 用報告來決定下一批有邊界的清理工作。
-- 不要盲目從工具執行 apply 類型的維護操作。
+- `raw/` 是唯讀——沒有工具會寫入。
+- 預設只報告。破壞性命令需要明確的 `--apply` 旗標。
+- 報告驅動有邊界的清理批次——不要盲目執行 apply。
+- LingOrm stub 依策略排除在 promote／error 檢查之外。
 
 ### 維護架構狀態
 
-這套維護架構的靈感來源包含：
+靈感來源：
 
 - [`kfchou/wiki-skills`](https://github.com/kfchou/wiki-skills)
 - [`lewislulu/llm-wiki-skill`](https://github.com/lewislulu/llm-wiki-skill)
 
-目前實作仍在進行中。這個公開腳手架展示的是 **report-first 維護層**，不是完整自動化的 wiki 改寫器。
-
-已完成：
+**已完成（Phase 1–4）：**
 
 - 公開／私人 agent 指令同步：`AGENTS.md` 與 `AGENTS_en.md`
 - session handoff 報告產生
 - blocked content gap 報告
-- status / frontmatter 稽核
-- index lint
+- status / frontmatter 稽核與作者欄位修復（`author-fix --apply`）
+- 索引 lint 與 bare-link 自動修正（`bare-link-fix --apply`）
+- 交叉參照 lint：斷鏈 wikilinks、孤兒頁、斷鏈 xref 區塊（`xref-lint`）
+- 可讀性 lint：偵測未消化的 wiki 頁面（`readability-lint`）
+- tags 稽核：缺欄位／空值、孤立 tag、頻率統計（`tags-lint`）
 - review finding reconciliation
 - raw-to-wiki coverage 報告
 - duplicate URL 偵測
 - canonical guard：偵測過期檔案與作者 frontmatter 規則違反
-- 一鍵 `scan` aggregator
+- 一鍵 `scan` aggregator（執行所有檢查）
 - pending raw-to-wiki matching（`pending-match`）與 digest injection（`inject-pending --apply`）
-- promote（`promote-ready --apply`）與作者欄位修復（`author-fix`）的安全 apply 流程
-- audit-list generation（`audit-list`）
-- CI gate（`tools/validate-wiki.ps1`）：發布前強制 0 errors
+- 安全的 promote 流程（`promote-ready --apply`）
+- audit inbox 生命週期（`audit-list`、`audit-resolve --apply`）
+- CI gate（`tools/validate-wiki.ps1`）——發布前強制 0 errors
+- 內容品質分流工具（`tools/gen_content_audit.py`）
 - 獨立的稽核驅動 OCR 擷取工具（`tools/wiki_ocr/`）
+- `wiki-maintenance` Claude Code skill：引導式批次維護
 
-尚未完成：
+**尚未完成：**
 
 - canonical cleanup automation
-- 多 agent 維護批次的 delegate integration
+- 多 agent 維護批次的 delegate integration（Phase 4.5）
+- Obsidian/Web feedback UI（Phase 5）
+
+---
+
+### 快速開始
+
+```powershell
+# 完整掃描——執行所有檢查，寫入 markdown 報告
+python tools\wiki_maintain.py scan --report
+
+# CI gate——發現任何 error 時 exit 1
+pwsh tools\validate-wiki.ps1
+
+# 為下一個 agent 產生 session handoff
+python tools\wiki_maintain.py handoff --task "batch-name" --next "next-step"
+```
 
 ### 常用指令
 
 ```powershell
+# 掃描與報告（彙整所有檢查）
+python tools\wiki_maintain.py scan --report
+
+# 個別 lint 檢查
 python tools\wiki_maintain.py status-audit --report
-python tools\wiki_maintain.py canonical-guard --report
 python tools\wiki_maintain.py index-lint --report
+python tools\wiki_maintain.py xref-lint --report
+python tools\wiki_maintain.py readability-lint --report
+python tools\wiki_maintain.py tags-lint --report
+python tools\wiki_maintain.py canonical-guard --report
 python tools\wiki_maintain.py coverage --report
 python tools\wiki_maintain.py duplicates --report
+
+# Apply 類型命令（需要 --apply 旗標）
+python tools\wiki_maintain.py promote-ready --apply --limit 10
+python tools\wiki_maintain.py author-fix --apply
+python tools\wiki_maintain.py bare-link-fix --apply
+python tools\wiki_maintain.py audit-resolve content-audit-2026-05-29.md --apply --summary "Done"
+
+# 營運類
 python tools\wiki_maintain.py blocked-report
+python tools\wiki_maintain.py audit-list --include-resolved
 python tools\wiki_maintain.py handoff --task "batch-name" --next "next-step"
 ```
 
-### 公開版 agent 指令同步
+---
 
-公開分支將 `AGENTS.md` 保留為私人工作 vault 中 `CLAUDE.md` 的清理版，並用 `AGENTS_en.md` 作為英文伴隨版本。在私人分支修改 `CLAUDE.md` 後，請從公開分支重新產生兩個公開指令檔：
+### 子命令參考
 
-```powershell
-python tools\sync_public_agents.py --source-ref master
-```
-
-若只想檢查 `AGENTS.md` 或 `AGENTS_en.md` 是否不同步，而不寫入檔案：
-
-```powershell
-python tools\sync_public_agents.py --source-ref master --check
-```
-
-同步腳本會移除私人分類／專案專用規則，並保留相對路徑以方便公開展示。如果 `AGENTS.md` 有變更，`AGENTS_en.md` 必須在同一個 commit 中更新。
-
-### Subcommand 參考
-
-| Subcommand | 主要用途 | 是否寫入報告／檔案 | 輸出路徑 | 是否修改 `wiki-pages/` |
+| 子命令 | 類型 | 嚴重度 | 用途 | 輸出 |
 |---|---|---|---|---|
-| `handoff` | 為下一個 agent／session 記錄目前 session 狀態 | 是 | `tasks/current-handoff.md` | 否 |
-| `blocked-report` | 列出尚不應 promote 的受阻頁面 | 是 | `tasks/blocked-content-gaps.md` | 否 |
-| `status-audit` | 稽核 `status` frontmatter 與 frontmatter schema 問題 | 搭配 `--report` 時可選擇寫入 | `tasks/maintenance-reports/status-audit-YYYY-MM-DD*.md` | 否 |
-| `index-lint` | 檢查索引連結、模糊 bare links、缺失目標，以及 stub marker 不一致 | 搭配 `--report` 時可選擇寫入 | `tasks/maintenance-reports/index-lint-YYYY-MM-DD*.md` | 否 |
-| `review-reconcile` | 將 review 發現分類為 cleanup-caused／deferred／pre-existing／environmental／dismissed | 是 | `tasks/maintenance-reports/review-reconcile-YYYY-MM-DD*.md` | 否 |
-| `coverage` | 找出尚未匯入 wiki 的 raw source pages | 搭配 `--report` 時可選擇寫入 | `tasks/maintenance-reports/ingest-candidates-YYYY-MM-DD*.md` | 否 |
-| `duplicates` | 偵測重複的 frontmatter URL，並建議 canonical | 搭配 `--report` 時可選擇寫入 | `tasks/maintenance-reports/duplicates-YYYY-MM-DD*.md` | 否 |
-| `canonical-guard` | 偵測過期的 canonical 衝突與 frontmatter 作者規則違反 | 搭配 `--report` 時可選擇寫入 | `tasks/maintenance-reports/canonical-guard-YYYY-MM-DD*.md` | 否 |
+| `scan` | report | — | 彙整所有報告型檢查為一份報告 | `audit/maintenance-reports/maintenance-report-YYYY-MM-DD*.md` |
+| `status-audit` | report | error | 偵測缺漏／未知 `status`、作者格式違規 | `audit/maintenance-reports/status-audit-YYYY-MM-DD*.md` |
+| `index-lint` | report | error/warn | 檢查索引連結、stub marker、摘要品質 | `audit/maintenance-reports/index-lint-YYYY-MM-DD*.md` |
+| `xref-lint` | report | warn/info | 斷鏈 wikilinks、孤兒頁、斷鏈 xref 區塊、缺少 xref 區塊 | `audit/maintenance-reports/xref-lint-YYYY-MM-DD*.md` |
+| `readability-lint` | report | info | 偵測未消化的 `status: wiki` 頁面（4 種信號） | `audit/maintenance-reports/readability-lint-YYYY-MM-DD*.md` |
+| `tags-lint` | report | info | 稽核 `tags:` 欄位：缺漏、空值、孤立 tag；頻率統計 | `audit/maintenance-reports/tags-lint-YYYY-MM-DD*.md` |
+| `canonical-guard` | report | error | 偵測過期 canonical 衝突與作者 frontmatter 違規 | `audit/maintenance-reports/canonical-guard-YYYY-MM-DD*.md` |
+| `coverage` | report | info | 找出尚未匯入 wiki 的 raw source | `audit/maintenance-reports/ingest-candidates-YYYY-MM-DD*.md` |
+| `duplicates` | report | error | 偵測重複的 frontmatter URL，建議 canonical | `audit/maintenance-reports/duplicates-YYYY-MM-DD*.md` |
+| `review-reconcile` | report | — | 將 review 發現分類到 reconciliation 類別 | `audit/maintenance-reports/review-reconcile-YYYY-MM-DD*.md` |
+| `blocked-report` | write | — | 列出無法自動 promote 的頁面 | `tasks/blocked-content-gaps.md` |
+| `handoff` | write | — | 為下一個 agent／session 記錄 session 狀態 | `tasks/current-handoff.md` |
+| `audit-list` | report | — | 列出 open audit items；`--include-resolved` 顯示已解決數 | stdout |
+| `audit-resolve` | apply | — | 解決 audit item：移到 `audit/resolved/`、附加 resolution | `audit/resolved/*.md` |
+| `author-fix` | apply | — | 修正 bare-string `作者` 為 canonical `["@handle"]` 格式 | 就地修改 wiki 檔 |
+| `bare-link-fix` | apply | — | 將模糊的 bare `[[wikilinks]]` 轉為明確的 relative links | 就地修改索引檔 |
+| `pending-match` | report | — | 比對外部 pending digest URL 與 wiki URL | stdout |
+| `inject-pending` | apply | — | 將 pending digest 內容注入匹配的 wiki stub | 就地修改 wiki 檔 |
+| `promote-ready` | apply | — | 將有足夠內容的非 LingOrm stub promote 為 `status: wiki` | 就地修改 wiki 檔 |
 
-### OCR 擷取工具
+所有報告型子命令支援 `--report` 寫入帶日期的 markdown 檔案。所有 apply 類型子命令預設為 dry-run，需要 `--apply` 才會寫入。
 
-`tools/wiki_ocr/` 底下的獨立 CLI，可讀取內容稽核報告，找出標記需要 OCR 的 wiki 頁面，透過 Playwright 擷取原始 Threads 貼文圖片，再經由 Gemini 進行 OCR，最後將 `## 圖片文字` 區塊附加到 wiki 頁面。
+---
+
+### 工具使用方法與 agent prompt
+
+#### `xref-lint` — 交叉參照 lint
+
+掃描所有非索引 wiki 頁面，偵測斷鏈 `[[wikilinks]]`、孤兒頁（未被任何頁面或索引引用）、`## Cross References` 區塊內的斷鏈。
 
 ```powershell
-# 乾跑模式：列出目標，不呼叫 API 也不寫入
-python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md
-python tools\wiki_ocr\audit_ocr.py tasks\content-quality-audit.md
+# 主控台輸出
+python tools\wiki_maintain.py xref-lint
 
-# 套用模式：擷取圖片、OCR、寫入 wiki 頁面
+# 寫入帶日期的報告
+python tools\wiki_maintain.py xref-lint --report
+# → audit/maintenance-reports/xref-lint-YYYY-MM-DD.md
+```
+
+**給 agent 的 prompt（搭配報告使用）：**
+
+```text
+請讀 audit/maintenance-reports/xref-lint-YYYY-MM-DD.md，處理所有 xref 問題。
+
+處理方式：
+- broken-xref-section：修正 Cross References 區塊的斷鏈 wikilink，改成正確的 relative link。
+- broken-wikilink：log.md 歷史斷鏈移除 [[]]，shell code 改 backtick，session-筆記範例改純文字。
+- orphan-page：加入適當的索引頁。
+- missing-xref-section：為缺少 ## Cross References 的 wiki/reference 頁面補上區塊，至少加 2-3 個相關頁面連結。數量多可分批處理，先處理前 20 個。
+
+修完跑 python tools/wiki_maintain.py xref-lint 和 pwsh tools/validate-wiki.ps1 驗證。
+```
+
+範例輸出：[`audit/example-reports/xref-lint-example.md`](audit/example-reports/xref-lint-example.md)
+
+---
+
+#### `readability-lint` — 內容可讀性檢查
+
+偵測 `status: wiki` 頁面中未經適當結構化處理的內容。四種信號類型：
+
+| 信號 | 意義 |
+|------|------|
+| `single-dump` | 0 個有意義的 heading + 無格式元素（純貼上） |
+| `no-headings` | <2 個有意義的 heading + 無格式元素 |
+| `social-tone` | emoji 群集或社群媒體短行風格 |
+| `no-formatting` | 有 heading 但無 bullet list、code block、table 或 blockquote |
+
+```powershell
+# 主控台輸出
+python tools\wiki_maintain.py readability-lint
+
+# 寫入帶日期的報告
+python tools\wiki_maintain.py readability-lint --report
+# → audit/maintenance-reports/readability-lint-YYYY-MM-DD.md
+
+# 包含在完整掃描中
+python tools\wiki_maintain.py scan --report
+```
+
+**給 agent 的 prompt（搭配報告使用）：**
+
+```text
+請讀 audit/maintenance-reports/readability-lint-YYYY-MM-DD.md，對其中的頁面進行批次重整。
+
+處理方式：
+- single-dump：只有 ## Main Content 無結構 → 重新組織成至少 2-3 個有意義的 H2，加摘要段
+- no-headings：有少量 heading 但不足 → 補齊段落結構
+- social-tone：emoji／口語化內文 → 改寫為正式 wiki 語氣，整理成段落
+- no-formatting：有標題但全是長段落 → 視內容適情況加 bullet list 或 table
+
+每次處理前先確認：頁面 URL 對應的來源內容是否仍可取得（Threads 帖文可能已刪除）。
+若來源已不可得，判斷現有內容是否足以 restructure（字數 > 300 → 可直接整理；否則降回 stub）。
+
+數量多，先處理前 20 個 single-dump，每批完成後跑：
+  python tools/wiki_maintain.py readability-lint
+確認 issue count 下降後再繼續。
+```
+
+範例輸出：[`audit/example-reports/readability-lint-example.md`](audit/example-reports/readability-lint-example.md)
+
+---
+
+#### `tags-lint` — Tags 欄位稽核
+
+稽核所有非索引 wiki 頁面的 `tags:` frontmatter 欄位。三種 issue 類型：
+
+| Issue | 嚴重度 | 意義 |
+|-------|--------|------|
+| `missing-tags-field` | info | wiki/reference 頁面缺少 `tags:` 欄位 |
+| `empty-tags` | info | wiki/reference 頁面的 `tags: []` 為空 |
+| `singleton-tag` | info | tag 在整個 wiki 只出現 1 次 |
+
+```powershell
+python tools\wiki_maintain.py tags-lint
+python tools\wiki_maintain.py tags-lint --report
+# → audit/maintenance-reports/tags-lint-YYYY-MM-DD.md
+```
+
+**給 agent 的 prompt（搭配報告使用）：**
+
+```text
+請讀 audit/maintenance-reports/tags-lint-YYYY-MM-DD.md。
+
+Phase A（低成本）：為 wiki/reference 頁面補上缺少的 tags: 欄位並填入 tags。
+- 根據頁面分類 + 標題 + 內容建議 2-4 個相關 tag。
+- 優先使用報告中頻率表裡的高頻 tag。
+- 格式：tags: [tag1, tag2, tag3]
+
+先處理前 20 個 missing-tags-field issue，每批完成後跑：
+  python tools/wiki_maintain.py tags-lint
+```
+
+範例輸出：[`audit/example-reports/tags-lint-example.md`](audit/example-reports/tags-lint-example.md)
+
+---
+
+#### `scan` — 完整維護掃描
+
+一次執行所有報告型檢查，產出合併報告。
+
+```powershell
+python tools\wiki_maintain.py scan --report
+# → audit/maintenance-reports/maintenance-report-YYYY-MM-DD.md
+
+# 搭配外部 pending digest 目錄
+python tools\wiki_maintain.py scan --report --pending-dir "D:\path\to\pending-digest"
+```
+
+報告包含摘要表、每項檢查詳情，以及建議的下一步 agent prompt。CI gate（`validate-wiki.ps1`）解析 scan 輸出的 `totals:` 行。
+
+範例輸出：[`audit/example-reports/scan-report-example.md`](audit/example-reports/scan-report-example.md)
+
+---
+
+#### `audit-resolve` — Audit inbox 生命週期
+
+解決 open audit items：移到 `audit/resolved/`、改寫 frontmatter、附加 `# Resolution` 區塊。
+
+```powershell
+# Dry-run（預設）
+python tools\wiki_maintain.py audit-resolve content-audit-2026-05-29.md --summary "Batches 1-7 complete"
+
+# 套用
+python tools\wiki_maintain.py audit-resolve content-audit-2026-05-29.md --summary "Batches 1-7 complete" --apply
+
+# 列出（含已解決數）
+python tools\wiki_maintain.py audit-list
+python tools\wiki_maintain.py audit-list --include-resolved
+```
+
+---
+
+### CI gate：`validate-wiki.ps1`
+
+PowerShell 包裝器，執行 `scan` 並在發現任何 error 時 exit non-zero。
+
+```powershell
+pwsh tools\validate-wiki.ps1
+
+# 搭配 pending 目錄
+pwsh tools\validate-wiki.ps1 -PendingDir "D:\path\to\pending-digest"
+```
+
+解析 `totals: errors=N warnings=M info=P` 行。Exit 0 = PASS（無 error），exit 1 = FAIL。
+
+---
+
+### 內容品質分流：`gen_content_audit.py`
+
+一次性工具，掃描 `wiki-pages/` 中 body < 500 字元的 `status: wiki` 或 `reference` 頁面，偵測內容信號（video、GitHub、CTA、外部 URL），並建議分流動作。
+
+```powershell
+python tools\gen_content_audit.py
+# → audit/content-audit-YYYY-MM-DD.md
+```
+
+**信號類型**：`video`、`github`、`cta`、`ext_url`、`tw_url_only`、`raw_gone`、`lingorm`
+
+**建議動作**：`re-ingest`、`ocr-images`、`demote-stub`、`manual-review`
+
+範例輸出：[`audit/example-reports/content-audit-example.md`](audit/example-reports/content-audit-example.md)
+
+---
+
+### Stub 頁面產生器：`fill_threads_stub_pages.py`
+
+從 `raw/threads-saved/` 來源檔案批次建立 stub 頁面。包含從 Threads URL 擷取作者與 OCR sanity check。
+
+```powershell
+# Dry-run
+python tools\fill_threads_stub_pages.py
+
+# 套用
+python tools\fill_threads_stub_pages.py --apply --limit 10
+```
+
+---
+
+### OCR 擷取工具：`wiki_ocr/`
+
+讀取內容稽核報告，找出標記需要 OCR 的 wiki 頁面，透過 Playwright 擷取原始 Threads 貼文圖片，再經由 Gemini 進行 OCR，最後附加 `## 圖片文字` 區塊。
+
+```powershell
+# Dry-run
+python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md
+
+# 套用（含限制）
 python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --apply --limit 3
 
-# 將輸出寫入 tasks/maintenance-reports/ocr-YYYY-MM-DD.md
+# 寫入報告
 python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --report
 ```
 
-這個工具支援兩種稽核報告格式（舊版自由文字與標準化 `ocr-images` token）。需要 `.env` 中的 `GEMINI_API_KEY` 以及 Playwright 來擷取瀏覽器中的圖片。`--report` 旗標會將輸出寫入 `tasks/maintenance-reports/ocr-YYYY-MM-DD[-N].md`，採用與 `wiki_maintain.py` subcommand 相同的命名慣例。核心元件（`_gemini_client.py`、`_image_ocr.py`）是從 `crawl-the-threads` 管線精簡克隆而來，只保留 Gemini OCR 路徑。
+需要 `.env` 中的 `GEMINI_API_KEY` 與 Playwright。
+
+---
+
+### 公開版 agent 指令同步
+
+```powershell
+# 從私人 CLAUDE.md 重新產生 AGENTS.md + AGENTS_en.md
+python tools\sync_public_agents.py --source-ref master
+
+# 檢查同步狀態而不寫入
+python tools\sync_public_agents.py --source-ref master --check
+```
+
+---
+
+### `wiki-maintenance` skill（Claude Code）
+
+Claude Code 專案 skill（`.claude/commands/wiki-maintenance.md`），自動化完整維護工作流程。
+
+**呼叫方式：**
+
+```text
+/wiki-maintenance
+```
+
+**運作流程：**
+
+1. 執行 `scan --report`，讀取最新報告。
+2. 呈現 P0–P3 triage 表格，詢問要處理哪個優先級。
+3. 批次修復：P0 全修 / P1 ≤20 / P2 ≤15 每批。
+4. 每批結束後跑 `pwsh tools/validate-wiki.ps1`（CI gate）。
+5. 完成後更新 `tasks/current-handoff.md`。
+
+**Triage 優先級：**
+
+| 優先級 | Issue 類型 | 行動 |
+|--------|-----------|------|
+| **P0** | `status-audit` errors、`canonical-guard` conflicts、`duplicates` errors | 立即全修 |
+| **P1** | `index-lint` warnings、`xref-lint` broken links | 本次 session 修復，≤20/批 |
+| **P2** | `readability-lint`、`tags-lint`、`xref-lint` orphans/missing-xref | 有時間再批次修，≤15/批 |
+| **P3** | `coverage` ingest candidates、`blocked` records | 僅回報，不自動修 |
+
+**給 agent 的 prompt：**
+
+```text
+/wiki-maintenance
+```
+
+在 triage 後指定優先級：
+
+```text
+處理 P0 和 P1。
+```
+
+指定特定 issue type：
+
+```text
+/wiki-maintenance
+
+triage 後只修 P2 readability-lint single-dump issue，前 15 個，修完跑 validate-wiki.ps1 再停。
+```
+
+---
 
 ### 目前 frontmatter 限制
 
-維護工具將 frontmatter 規則視為硬性限制。特別是，`作者` 欄位會被視為 YAML list 欄位：
+`作者` 欄位視為 YAML list 欄位：
 
 ```yaml
 作者: ["@handle"]
@@ -178,11 +478,25 @@ python tools\wiki_ocr\audit_ocr.py audit\content-audit-2026-05-29.md --report
 作者: [handle]
 ```
 
-這條規則會透過 `status-audit` 與 `canonical-guard` 顯示。未來的 normalize／rewrite 流程應保留有效的 list 語法。
+透過 `status-audit` 與 `canonical-guard` 顯示。
+
+---
+
+## 範例報告
+
+`audit/example-reports/` 目錄包含每個工具的清理後範例輸出，展示報告格式而不暴露私人 wiki 內容：
+
+| 報告 | 工具 | 展示內容 |
+|------|------|----------|
+| [`scan-report-example.md`](audit/example-reports/scan-report-example.md) | `scan --report` | 完整彙整維護報告 |
+| [`xref-lint-example.md`](audit/example-reports/xref-lint-example.md) | `xref-lint --report` | 斷鏈 wikilinks、孤兒頁、xref 區塊問題 |
+| [`readability-lint-example.md`](audit/example-reports/readability-lint-example.md) | `readability-lint --report` | 未消化的 wiki 頁面與信號分類 |
+| [`tags-lint-example.md`](audit/example-reports/tags-lint-example.md) | `tags-lint --report` | 缺漏／空值 tags、孤立 tag、頻率統計 |
+| [`content-audit-example.md`](audit/example-reports/content-audit-example.md) | `gen_content_audit.py` | 內容品質分流（含信號與動作） |
 
 ## 包含的維護輸出
 
-在私人工作 vault 中，`tasks/` 是交接、受阻頁面報告、promote inventory 與帶日期掃描輸出的操作層。公開腳手架只保留 `tasks/maintenance-reports/.gitkeep`；產生的報告會刻意被忽略，避免私人維護狀態外洩到 showcase commit。
+在私人工作 vault 中，`tasks/` 與 `audit/` 是交接、報告與 audit 生命週期的操作層。公開腳手架只保留佔位目錄；產生的報告會刻意被忽略，避免私人維護狀態外洩到 showcase commit。
 
 ## 頁面狀態
 

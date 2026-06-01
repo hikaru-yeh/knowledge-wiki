@@ -4,6 +4,7 @@ import argparse
 import re
 import subprocess
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -13,6 +14,7 @@ from urllib.parse import unquote, urlsplit
 WIKI_DIR_DEFAULT = "wiki-pages"
 RAW_DIR_DEFAULT = "raw"
 TASKS_DIR_DEFAULT = "tasks"
+REPORT_DIR_DEFAULT = "audit"
 HANDOFF_PATH = "current-handoff.md"
 BLOCKED_PATH = "blocked-content-gaps.md"
 MAINTENANCE_REPORTS_DIR = "maintenance-reports"
@@ -22,6 +24,27 @@ PROJECT_MANAGEMENT_CATEGORY = "專案管理"
 STUB_INDEX_MARKER = "（📌 stub）"
 RAW_PATH_RE = re.compile(r"raw[\\/]")
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+XREF_SECTION_RE = re.compile(r"^##\s+Cross\s+References\s*$", re.IGNORECASE)
+ORPHAN_EXCLUDE_STEMS: set[str] = {"log", "日誌", "_overview", "daily-recap"}
+ORPHAN_EXCLUDE_CATEGORIES: set[str] = {"專案管理", "session-筆記"}
+
+READABILITY_MEANINGFUL_HEADING_RE = re.compile(
+    r"^#{2,3}\s+(?!Main\s+Content|Cross\s+References)\S",
+    re.MULTILINE | re.IGNORECASE,
+)
+READABILITY_EMOJI_HEAVY_RE = re.compile(
+    r"[\U0001F300-\U0001F9FF\U00002600-\U000027BF\U0000FE00-\U0000FEFF]{2,}"
+)
+READABILITY_SOCIAL_TONE_RE = re.compile(
+    r"(?:😂|🤣|哈哈|XD|lol|OMG){2,}",
+    re.MULTILINE,
+)
+READABILITY_FORMAT_ELEMENTS_RE = re.compile(
+    r"^(?:[-*+]\s|\d+\.\s|>\s|```|\|.+\|)",
+    re.MULTILINE,
+)
+READABILITY_MIN_HEADINGS = 2
+READABILITY_MIN_BODY_FOR_CHECK = 200
 
 PLACEHOLDER_MARKERS = {
     "（📌 待消化）",
@@ -116,6 +139,93 @@ class IndexLint:
 
 
 @dataclass(frozen=True)
+class XrefIssue:
+    code: str          # "broken-wikilink", "orphan-page", "broken-xref-section", "missing-xref-section"
+    path: str          # repo-relative path of page with issue
+    line: int | None   # line number in body (None for orphan-page / missing-xref-section)
+    target: str        # broken link target or orphan page path or page stem
+    detail: str
+
+
+@dataclass(frozen=True)
+class XrefLint:
+    scanned_pages: int
+    broken_links: int
+    orphan_pages: int
+    broken_xref: int
+    missing_xref: int
+    issues: list[XrefIssue]
+
+
+@dataclass(frozen=True)
+class ReadabilityIssue:
+    code: str          # "single-dump", "no-headings", "social-tone", "no-formatting"
+    path: str          # repo-relative path
+    detail: str
+    body_length: int
+    heading_count: int
+
+
+@dataclass(frozen=True)
+class ReadabilityLint:
+    scanned_pages: int
+    issues: list[ReadabilityIssue]
+
+    @property
+    def no_headings(self) -> int:
+        return sum(1 for i in self.issues if i.code == "no-headings")
+
+    @property
+    def single_dump(self) -> int:
+        return sum(1 for i in self.issues if i.code == "single-dump")
+
+    @property
+    def social_tone(self) -> int:
+        return sum(1 for i in self.issues if i.code == "social-tone")
+
+    @property
+    def no_formatting(self) -> int:
+        return sum(1 for i in self.issues if i.code == "no-formatting")
+
+
+@dataclass(frozen=True)
+class TagIssue:
+    code: str          # "missing-tags-field", "empty-tags", "singleton-tag"
+    path: str          # repo-relative path
+    status: str        # page status
+    detail: str
+
+
+@dataclass(frozen=True)
+class TagStats:
+    tag: str
+    count: int
+
+
+@dataclass(frozen=True)
+class TagsLint:
+    total_pages: int
+    pages_with_tags_field: int
+    pages_with_nonempty_tags: int
+    pages_without_tags_field: int
+    pages_with_empty_tags: int
+    issues: list[TagIssue]
+    tag_frequency: list[TagStats]  # sorted descending by count
+
+    @property
+    def missing_field(self) -> int:
+        return sum(1 for i in self.issues if i.code == "missing-tags-field")
+
+    @property
+    def empty_tags(self) -> int:
+        return sum(1 for i in self.issues if i.code == "empty-tags")
+
+    @property
+    def singleton_tags(self) -> int:
+        return sum(1 for i in self.issues if i.code == "singleton-tag")
+
+
+@dataclass(frozen=True)
 class ReviewFinding:
     source: str
     text: str
@@ -188,6 +298,7 @@ def normalize_rel_path(path: Path, root: Path) -> str:
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
+    text = text.lstrip("﻿")  # strip UTF-8 BOM (U+FEFF) added by some Windows editors
     if not text.startswith("---"):
         return {}, text
 
@@ -617,6 +728,13 @@ def issue_counts(issues: list[IndexIssue]) -> dict[str, int]:
     return counts
 
 
+def xref_issue_counts(issues: list[XrefIssue]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for issue in issues:
+        counts[issue.code] = counts.get(issue.code, 0) + 1
+    return counts
+
+
 def review_reconcile_counts(findings: list[ReviewFinding]) -> dict[str, int]:
     counts = {bucket: 0 for bucket in REVIEW_RECONCILE_BUCKETS}
     for finding in findings:
@@ -821,6 +939,284 @@ def collect_index_lint(root: Path, wiki_dir: Path, raw_dir: Path) -> IndexLint:
     return IndexLint(scanned_pages=len(index_pages), issues=issues)
 
 
+def collect_xref_lint(root: Path, wiki_dir: Path, raw_dir: Path) -> XrefLint:
+    pages = load_wiki_pages(root, wiki_dir)
+    wiki_base = (root / wiki_dir).resolve()
+
+    pages_by_stem: dict[str, list[PageRecord]] = {}
+    pages_by_wiki_target: dict[str, PageRecord] = {}
+    pages_by_path: dict[Path, PageRecord] = {}
+    for page in pages:
+        pages_by_stem.setdefault(page.stem, []).append(page)
+        pages_by_wiki_target[page.wiki_rel_path] = page
+        if page.wiki_rel_path.endswith(".md"):
+            pages_by_wiki_target[page.wiki_rel_path[:-3]] = page
+        pages_by_path[page.path.resolve()] = page
+
+    referenced: set[str] = set()
+    issues: list[XrefIssue] = []
+    non_index_pages = [p for p in pages if not is_index_page(p)]
+
+    for page in non_index_pages:
+        in_xref_section = False
+
+        for line_no, line in enumerate(page.body.splitlines(), start=1):
+            if XREF_SECTION_RE.match(line.strip()):
+                in_xref_section = True
+                continue
+            heading = markdown_heading_text(line)
+            if heading is not None and heading[0] <= 2 and in_xref_section:
+                in_xref_section = False
+
+            for match in WIKILINK_RE.finditer(line):
+                target = wikilink_target(match.group(1))
+                if not target:
+                    continue
+                linked = resolve_wikilink_pages(target, pages_by_stem, pages_by_wiki_target)
+                if linked:
+                    for lp in linked:
+                        referenced.add(lp.rel_path)
+                else:
+                    code = "broken-xref-section" if in_xref_section else "broken-wikilink"
+                    issues.append(XrefIssue(
+                        code=code,
+                        path=page.rel_path,
+                        line=line_no,
+                        target=target,
+                        detail="wikilink target not found",
+                    ))
+
+            for dest in iter_markdown_link_destinations(line):
+                md_target = markdown_link_target(dest)
+                if is_ignored_markdown_target(md_target):
+                    continue
+                resolved = resolve_markdown_target(page.path.parent, md_target, wiki_base)
+                if resolved is None:
+                    code = "broken-xref-section" if in_xref_section else "broken-wikilink"
+                    issues.append(XrefIssue(
+                        code=code,
+                        path=page.rel_path,
+                        line=line_no,
+                        target=md_target,
+                        detail="markdown link target not found or outside wiki",
+                    ))
+                else:
+                    linked_page = pages_by_path.get(resolved)
+                    if linked_page is not None:
+                        referenced.add(linked_page.rel_path)
+
+    for page in pages:
+        if not is_index_page(page):
+            continue
+        for line in page.body.splitlines():
+            for match in WIKILINK_RE.finditer(line):
+                target = wikilink_target(match.group(1))
+                if not target:
+                    continue
+                linked = resolve_wikilink_pages(target, pages_by_stem, pages_by_wiki_target)
+                for lp in linked:
+                    referenced.add(lp.rel_path)
+            for dest in iter_markdown_link_destinations(line):
+                md_target = markdown_link_target(dest)
+                if is_ignored_markdown_target(md_target):
+                    continue
+                resolved = resolve_markdown_target(page.path.parent, md_target, wiki_base)
+                if resolved is not None:
+                    linked_page = pages_by_path.get(resolved)
+                    if linked_page is not None:
+                        referenced.add(linked_page.rel_path)
+
+    for page in pages:
+        if is_index_page(page):
+            continue
+        if page.stem in ORPHAN_EXCLUDE_STEMS:
+            continue
+        if page.category in ORPHAN_EXCLUDE_CATEGORIES:
+            continue
+        if page.rel_path not in referenced:
+            issues.append(XrefIssue(
+                code="orphan-page",
+                path=page.rel_path,
+                line=None,
+                target=page.stem,
+                detail="page not referenced by any other wiki page or index",
+            ))
+
+    # Detect non-index wiki/reference pages missing ## Cross References section
+    for page in non_index_pages:
+        if page.status not in ("wiki", "reference"):
+            continue
+        if page.stem in ORPHAN_EXCLUDE_STEMS:
+            continue
+        if page.category in ORPHAN_EXCLUDE_CATEGORIES:
+            continue
+        has_xref = any(XREF_SECTION_RE.match(line.strip()) for line in page.body.splitlines())
+        if not has_xref:
+            issues.append(XrefIssue(
+                code="missing-xref-section",
+                path=page.rel_path,
+                line=None,
+                target=page.stem,
+                detail=f"status={page.status} page has no ## Cross References section",
+            ))
+
+    broken_links = sum(1 for i in issues if i.code == "broken-wikilink")
+    orphans = sum(1 for i in issues if i.code == "orphan-page")
+    broken_xref = sum(1 for i in issues if i.code == "broken-xref-section")
+    missing_xref = sum(1 for i in issues if i.code == "missing-xref-section")
+
+    return XrefLint(
+        scanned_pages=len(non_index_pages),
+        broken_links=broken_links,
+        orphan_pages=orphans,
+        broken_xref=broken_xref,
+        missing_xref=missing_xref,
+        issues=issues,
+    )
+
+
+def collect_readability_lint(root: Path, wiki_dir: Path) -> ReadabilityLint:
+    """Scan status:wiki pages for undigested/unformatted content."""
+    pages = load_wiki_pages(root, wiki_dir)
+    issues: list[ReadabilityIssue] = []
+    scanned = 0
+
+    for page in pages:
+        if is_index_page(page):
+            continue
+        if page.status != "wiki":
+            continue
+        body = page.body.strip()
+        if len(body) < READABILITY_MIN_BODY_FOR_CHECK:
+            continue
+
+        scanned += 1
+        headings = READABILITY_MEANINGFUL_HEADING_RE.findall(body)
+        heading_count = len(headings)
+        has_format_elements = bool(READABILITY_FORMAT_ELEMENTS_RE.search(body))
+        has_social_tone = bool(READABILITY_SOCIAL_TONE_RE.search(body))
+        emoji_matches = READABILITY_EMOJI_HEAVY_RE.findall(body)
+
+        if heading_count < READABILITY_MIN_HEADINGS and not has_format_elements:
+            issues.append(ReadabilityIssue(
+                code="single-dump" if heading_count == 0 else "no-headings",
+                path=page.rel_path,
+                detail=f"{heading_count} meaningful headings, no format elements",
+                body_length=len(body),
+                heading_count=heading_count,
+            ))
+        elif has_social_tone or len(emoji_matches) >= 3:
+            issues.append(ReadabilityIssue(
+                code="social-tone",
+                path=page.rel_path,
+                detail="social media tone detected (emoji clusters or short-line bursts)",
+                body_length=len(body),
+                heading_count=heading_count,
+            ))
+        elif not has_format_elements:
+            issues.append(ReadabilityIssue(
+                code="no-formatting",
+                path=page.rel_path,
+                detail="has headings but no bullet lists, code blocks, tables, or blockquotes",
+                body_length=len(body),
+                heading_count=heading_count,
+            ))
+
+    return ReadabilityLint(scanned_pages=scanned, issues=issues)
+
+
+def _parse_tags_value(raw: str) -> list[str]:
+    """Parse frontmatter tags value into a list of individual tags.
+
+    Handles: `[tag1, tag2]`, `[]`, `- tag1\\n- tag2`, bare `tag1`.
+    """
+    text = raw.strip()
+    if not text or text in ("[]", "[ ]"):
+        return []
+    if text.startswith("[") and text.endswith("]"):
+        inner = text[1:-1].strip()
+        if not inner:
+            return []
+        return [t.strip().strip("'\"") for t in inner.split(",") if t.strip()]
+    if text.startswith("- "):
+        return [line.lstrip("- ").strip() for line in text.splitlines() if line.strip().startswith("- ")]
+    return [text]
+
+
+def collect_tags_lint(root: Path, wiki_dir: Path) -> TagsLint:
+    """Audit frontmatter tags field across all wiki pages."""
+    pages = load_wiki_pages(root, wiki_dir)
+    issues: list[TagIssue] = []
+    all_tags: list[str] = []
+    has_field = 0
+    nonempty = 0
+    empty = 0
+    no_field = 0
+
+    for page in pages:
+        if is_index_page(page):
+            continue
+
+        raw_tags = page.frontmatter.get("tags")
+        if raw_tags is None:
+            no_field += 1
+            if page.status in ("wiki", "reference"):
+                issues.append(TagIssue(
+                    code="missing-tags-field",
+                    path=page.rel_path,
+                    status=page.status,
+                    detail="no tags: field in frontmatter",
+                ))
+            continue
+
+        has_field += 1
+        parsed = _parse_tags_value(raw_tags)
+        if not parsed:
+            empty += 1
+            if page.status in ("wiki", "reference"):
+                issues.append(TagIssue(
+                    code="empty-tags",
+                    path=page.rel_path,
+                    status=page.status,
+                    detail="tags: [] (empty)",
+                ))
+        else:
+            nonempty += 1
+            all_tags.extend(parsed)
+
+    tag_counts = Counter(all_tags)
+    for tag, count in tag_counts.items():
+        if count == 1:
+            matching = [
+                p for p in pages
+                if not is_index_page(p)
+                and tag in _parse_tags_value(p.frontmatter.get("tags", ""))
+            ]
+            if matching:
+                issues.append(TagIssue(
+                    code="singleton-tag",
+                    path=matching[0].rel_path,
+                    status=matching[0].status,
+                    detail=f"tag '{tag}' used only once",
+                ))
+
+    freq = sorted(
+        [TagStats(tag=t, count=c) for t, c in tag_counts.items()],
+        key=lambda x: (-x.count, x.tag),
+    )
+
+    total = has_field + no_field
+    return TagsLint(
+        total_pages=total,
+        pages_with_tags_field=has_field,
+        pages_with_nonempty_tags=nonempty,
+        pages_without_tags_field=no_field,
+        pages_with_empty_tags=empty,
+        issues=issues,
+        tag_frequency=freq,
+    )
+
+
 def git_status(root: Path) -> list[str]:
     try:
         result = subprocess.run(
@@ -884,6 +1280,10 @@ def resolve_tasks_dir(root: Path, value: str) -> Path:
     return resolve_root_relative_dir(root, value, "--tasks-dir")
 
 
+def resolve_report_dir(root: Path, value: str) -> Path:
+    return resolve_root_relative_dir(root, value, "--report-dir")
+
+
 def _scan_maintenance_reports(tasks_dir: Path, tasks_dir_rel: str) -> list[tuple[str, str]]:
     """Return list of (rel_path, label) for the most recent report of each type found.
 
@@ -926,7 +1326,7 @@ def _scan_maintenance_reports(tasks_dir: Path, tasks_dir_rel: str) -> list[tuple
     return result
 
 
-def render_handoff(task: str, next_step: str, root: Path, tasks_dir: Path) -> str:
+def render_handoff(task: str, next_step: str, root: Path, tasks_dir: Path, report_dir: Path | None = None) -> str:
     now = datetime.now().replace(microsecond=0).isoformat()
     status_lines = git_status(root)
     batch_paths = {
@@ -941,9 +1341,10 @@ def render_handoff(task: str, next_step: str, root: Path, tasks_dir: Path) -> st
         if not status_path(line).startswith("raw/") and status_path(line) not in batch_paths
     ]
 
-    tasks_dir_rel = tasks_dir.as_posix()
-    resolved_tasks_dir = (root / tasks_dir).resolve() if not tasks_dir.is_absolute() else tasks_dir.resolve()
-    available_reports = _scan_maintenance_reports(resolved_tasks_dir, tasks_dir_rel)
+    effective_report_dir = report_dir if report_dir is not None else tasks_dir
+    report_dir_rel = effective_report_dir.as_posix()
+    resolved_report_dir = (root / effective_report_dir).resolve() if not effective_report_dir.is_absolute() else effective_report_dir.resolve()
+    available_reports = _scan_maintenance_reports(resolved_report_dir, report_dir_rel)
 
     lines = [
         "# Current Handoff",
@@ -972,7 +1373,7 @@ def render_handoff(task: str, next_step: str, root: Path, tasks_dir: Path) -> st
         for rel, label in available_reports:
             lines.append(f"- `{rel}` ({label})")
     else:
-        lines.append("No report files found yet in `tasks/maintenance-reports/`.")
+        lines.append(f"No report files found yet in `{report_dir_rel}/{MAINTENANCE_REPORTS_DIR}/`.")
 
     lines.extend(
         [
@@ -1249,6 +1650,159 @@ def render_index_lint_report(lint: IndexLint, report_date: str, wiki_dir: Path) 
     return "\n".join(lines)
 
 
+def render_xref_lint_report(lint: XrefLint, report_date: str, wiki_dir: Path) -> str:
+    counts = xref_issue_counts(lint.issues)
+    lines = [
+        f"# Cross-Reference Lint - {report_date}",
+        "",
+        f"Scans all non-index pages under `{wiki_dir.as_posix().rstrip('/')}/` for broken wikilinks, orphan pages, and broken Cross References sections.",
+        "",
+        "## Summary",
+        "",
+        f"- Non-index pages scanned: {lint.scanned_pages}",
+        f"- Broken wikilinks: {lint.broken_links}",
+        f"- Orphan pages: {lint.orphan_pages}",
+        f"- Broken Cross References section links: {lint.broken_xref}",
+        f"- Missing Cross References section: {lint.missing_xref}",
+        f"- Total issues: {len(lint.issues)}",
+        "",
+        "| Code | Count |",
+        "|---|---:|",
+    ]
+    for code in ["broken-wikilink", "orphan-page", "broken-xref-section", "missing-xref-section"]:
+        lines.append(f"| {code} | {counts.get(code, 0)} |")
+
+    for code in ["broken-wikilink", "broken-xref-section", "orphan-page", "missing-xref-section"]:
+        code_issues = [i for i in lint.issues if i.code == code]
+        if not code_issues:
+            continue
+        lines.extend(["", f"## {code} ({len(code_issues)})", ""])
+        if code in ("orphan-page", "missing-xref-section"):
+            lines.extend(["| Page | Stem |", "|---|---|"])
+            for issue in code_issues[:100]:
+                lines.append(f"| `{markdown_cell(issue.path)}` | {markdown_cell(issue.target)} |")
+            if len(code_issues) > 100:
+                lines.append(f"| ... | | {len(code_issues) - 100} more |")
+        else:
+            lines.extend(["| Page | Line | Target | Detail |", "|---|---:|---|---|"])
+            for issue in code_issues[:50]:
+                lines.append(
+                    f"| `{markdown_cell(issue.path)}` | {issue.line} "
+                    f"| `{markdown_cell(issue.target)}` | {markdown_cell(issue.detail)} |"
+                )
+            if len(code_issues) > 50:
+                lines.append(f"| ... | | | {len(code_issues) - 50} more |")
+
+    return "\n".join(lines)
+
+
+def unique_xref_lint_report_path(report_dir: Path, report_date: str) -> Path:
+    first_path = report_dir / f"xref-lint-{report_date}.md"
+    if not first_path.exists():
+        return first_path
+    for index in range(2, 1000):
+        path = report_dir / f"xref-lint-{report_date}-{index}.md"
+        if not path.exists():
+            return path
+    raise RuntimeError(f"too many xref-lint reports already exist for {report_date}")
+
+
+def render_readability_lint_report(lint: ReadabilityLint, report_date: str) -> str:
+    lines = [
+        f"# Readability Lint Report - {report_date}",
+        "",
+        f"Scanned: {lint.scanned_pages} wiki pages (status: wiki, body >= {READABILITY_MIN_BODY_FOR_CHECK} chars)",
+        f"Issues: {len(lint.issues)}",
+        "",
+        "| # | Code | Path | Headings | Body len | Detail |",
+        "|---|------|------|---:|---:|--------|",
+    ]
+    for i, issue in enumerate(lint.issues, 1):
+        lines.append(
+            f"| {i} | {issue.code} | `{issue.path}` | {issue.heading_count} | {issue.body_length} | {issue.detail} |"
+        )
+    lines.append("")
+    lines.append("## Issue Codes")
+    lines.append("")
+    lines.append("| Code | Meaning | Suggested action |")
+    lines.append("|------|---------|-----------------|")
+    lines.append("| `single-dump` | 0 meaningful headings + no format elements | re-ingest or restructure |")
+    lines.append("| `no-headings` | <2 meaningful headings + no format elements | add heading structure |")
+    lines.append("| `social-tone` | emoji clusters in wiki-status content | restructure into wiki format |")
+    lines.append("| `no-formatting` | has headings but no bullets/code/tables/blockquotes | add structure |")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def unique_readability_lint_report_path(report_dir: Path, report_date: str) -> Path:
+    base = report_dir / f"readability-lint-{report_date}.md"
+    if not base.exists():
+        return base
+    n = 2
+    while True:
+        candidate = report_dir / f"readability-lint-{report_date}-{n}.md"
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
+def unique_tags_lint_report_path(report_dir: Path, report_date: str) -> Path:
+    base = report_dir / f"tags-lint-{report_date}.md"
+    if not base.exists():
+        return base
+    n = 2
+    while True:
+        candidate = report_dir / f"tags-lint-{report_date}-{n}.md"
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
+def render_tags_lint_report(result: TagsLint, report_date: str) -> str:
+    lines = [
+        f"# Tags Lint Report - {report_date}",
+        "",
+        "## Summary",
+        "",
+        f"- Total pages scanned: {result.total_pages}",
+        f"- Pages with `tags:` field: {result.pages_with_tags_field}",
+        f"  - Non-empty tags: {result.pages_with_nonempty_tags}",
+        f"  - Empty `tags: []`: {result.pages_with_empty_tags}",
+        f"- Pages without `tags:` field: {result.pages_without_tags_field}",
+        f"- Total issues: {len(result.issues)}",
+        f"  - missing-tags-field: {result.missing_field}",
+        f"  - empty-tags: {result.empty_tags}",
+        f"  - singleton-tag: {result.singleton_tags}",
+        "",
+    ]
+
+    if result.issues:
+        lines.append("## Issues")
+        lines.append("")
+        for code in ("missing-tags-field", "empty-tags", "singleton-tag"):
+            subset = [i for i in result.issues if i.code == code]
+            if not subset:
+                continue
+            lines.append(f"### {code} ({len(subset)})")
+            lines.append("")
+            for issue in subset:
+                lines.append(f"- `{issue.path}` (status: {issue.status}) — {issue.detail}")
+            lines.append("")
+
+    if result.tag_frequency:
+        lines.append("## Tag Frequency")
+        lines.append("")
+        lines.append("| Tag | Count |")
+        lines.append("|-----|------:|")
+        for ts in result.tag_frequency[:50]:
+            lines.append(f"| {ts.tag} | {ts.count} |")
+        if len(result.tag_frequency) > 50:
+            lines.append(f"| ... | ({len(result.tag_frequency) - 50} more) |")
+        lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
 def render_review_reconcile_report(
     findings: list[ReviewFinding],
     report_date: str,
@@ -1377,7 +1931,18 @@ def collect_coverage(root: Path, wiki_dir: Path, raw_dir: Path) -> CoverageResul
     raw_only: list[CoverageEntry] = []
     raw_missing_url: list[RawRecord] = []
 
+    # Load optional exclusion list (repo-relative forward-slash paths)
+    exclusion_file = root / "tasks" / "coverage-excluded-raw.txt"
+    excluded_raw: set[str] = set()
+    if exclusion_file.exists():
+        for line in read_text(exclusion_file).splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                excluded_raw.add(line)
+
     for record in raw_records:
+        if record.rel_path in excluded_raw:
+            continue
         if not record.url:
             raw_missing_url.append(record)
         elif record.url not in wiki_urls:
@@ -1519,7 +2084,7 @@ def command_handoff(args: argparse.Namespace) -> int:
         print(f"error: {error}", file=sys.stderr)
         return 2
     output_path = tasks_dir / HANDOFF_PATH
-    content = render_handoff(args.task, args.next, root, Path(args.tasks_dir))
+    content = render_handoff(args.task, args.next, root, Path(args.tasks_dir), report_dir=Path(args.report_dir))
     write_text(output_path, content)
     print(f"wrote {normalize_rel_path(output_path, root)}")
     return 0
@@ -1588,8 +2153,8 @@ def command_status_audit(args: argparse.Namespace) -> int:
     if args.report:
         report_date = args.date or date.today().isoformat()
         try:
-            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
-            report_path = unique_status_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_status_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
         except (RuntimeError, ValueError) as error:
             print(f"error: {error}", file=sys.stderr)
             return 2
@@ -1614,13 +2179,139 @@ def command_index_lint(args: argparse.Namespace) -> int:
     if args.report:
         report_date = args.date or date.today().isoformat()
         try:
-            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
-            report_path = unique_index_lint_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_index_lint_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
         except (RuntimeError, ValueError) as error:
             print(f"error: {error}", file=sys.stderr)
             return 2
         write_text(report_path, render_index_lint_report(lint, report_date, Path(args.wiki_dir)))
         print(f"wrote {normalize_rel_path(report_path, root)}")
+
+    return 0
+
+
+def command_xref_lint(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    lint = collect_xref_lint(root, Path(args.wiki_dir), Path(args.raw_dir))
+    counts = xref_issue_counts(lint.issues)
+
+    print("xref-lint")
+    print(f"non-index pages scanned: {lint.scanned_pages}")
+    print(f"total issues: {len(lint.issues)}")
+    for code in ["broken-wikilink", "orphan-page", "broken-xref-section", "missing-xref-section"]:
+        print(f"{code}: {counts.get(code, 0)}")
+
+    broken = [i for i in lint.issues if i.code in ("broken-wikilink", "broken-xref-section")]
+    for issue in broken[:20]:
+        print(f"- {issue.path}:{issue.line} [{issue.code}] {issue.target} - {issue.detail}")
+    if len(broken) > 20:
+        print(f"... and {len(broken) - 20} more broken links")
+
+    orphans = [i for i in lint.issues if i.code == "orphan-page"]
+    if orphans:
+        print(f"\norphan pages ({len(orphans)}):")
+        for issue in orphans[:30]:
+            print(f"  {issue.path}")
+        if len(orphans) > 30:
+            print(f"  ... and {len(orphans) - 30} more")
+
+    missing = [i for i in lint.issues if i.code == "missing-xref-section"]
+    if missing:
+        print(f"\nmissing Cross References ({len(missing)}):")
+        for issue in missing[:30]:
+            print(f"  {issue.path}")
+        if len(missing) > 30:
+            print(f"  ... and {len(missing) - 30} more")
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_xref_lint_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
+        except (RuntimeError, ValueError) as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
+        write_text(report_path, render_xref_lint_report(lint, report_date, Path(args.wiki_dir)))
+        print(f"wrote {normalize_rel_path(report_path, root)}")
+
+    return 0
+
+
+def command_readability_lint(args: argparse.Namespace) -> int:
+    root = Path(args.root).resolve()
+    wiki_dir = Path(args.wiki_dir)
+
+    result = collect_readability_lint(root, wiki_dir)
+
+    print("readability-lint")
+    print(f"scanned: {result.scanned_pages} wiki pages")
+    print(f"issues: {len(result.issues)}")
+    if result.issues:
+        print(f"  single-dump: {result.single_dump}")
+        print(f"  no-headings: {result.no_headings}")
+        print(f"  social-tone: {result.social_tone}")
+        print(f"  no-formatting: {result.no_formatting}")
+        print()
+        for issue in result.issues[:30]:
+            print(f"  {issue.code}: {issue.path} ({issue.body_length} chars, {issue.heading_count} headings)")
+        if len(result.issues) > 30:
+            print(f"  ... and {len(result.issues) - 30} more")
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_readability_lint_report_path(
+                report_dir / MAINTENANCE_REPORTS_DIR, report_date
+            )
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            write_text(report_path, render_readability_lint_report(result, report_date))
+            print(f"\nReport written: {normalize_rel_path(report_path, root)}")
+        except RuntimeError as exc:
+            print(f"warning: {exc}", file=sys.stderr)
+
+    return 0
+
+
+def command_tags_lint(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    wiki_dir = Path(args.wiki_dir)
+
+    result = collect_tags_lint(root, wiki_dir)
+
+    print("tags-lint")
+    print(f"scanned: {result.total_pages} pages (excluding index)")
+    print(f"with tags field: {result.pages_with_tags_field} ({result.pages_with_nonempty_tags} non-empty, {result.pages_with_empty_tags} empty)")
+    print(f"without tags field: {result.pages_without_tags_field}")
+    print(f"issues: {len(result.issues)}")
+    if result.issues:
+        print(f"  missing-tags-field: {result.missing_field}")
+        print(f"  empty-tags: {result.empty_tags}")
+        print(f"  singleton-tag: {result.singleton_tags}")
+        print()
+        for issue in result.issues[:30]:
+            print(f"  {issue.code}: {issue.path} — {issue.detail}")
+        if len(result.issues) > 30:
+            print(f"  ... and {len(result.issues) - 30} more")
+
+    if result.tag_frequency:
+        print(f"\nUnique tags: {len(result.tag_frequency)}")
+        print("Top 10:")
+        for ts in result.tag_frequency[:10]:
+            print(f"  {ts.tag}: {ts.count}")
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_tags_lint_report_path(
+                report_dir / MAINTENANCE_REPORTS_DIR, report_date
+            )
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            write_text(report_path, render_tags_lint_report(result, report_date))
+            print(f"\nReport written: {normalize_rel_path(report_path, root)}")
+        except RuntimeError as exc:
+            print(f"warning: {exc}", file=sys.stderr)
 
     return 0
 
@@ -1645,8 +2336,8 @@ def command_review_reconcile(args: argparse.Namespace) -> int:
 
     report_date = args.date or date.today().isoformat()
     try:
-        tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
-        report_path = unique_review_reconcile_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+        report_dir = resolve_report_dir(root, args.report_dir)
+        report_path = unique_review_reconcile_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
     except (RuntimeError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
@@ -1670,8 +2361,8 @@ def command_coverage(args: argparse.Namespace) -> int:
     if args.report:
         report_date = args.date or date.today().isoformat()
         try:
-            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
-            report_path = unique_ingest_candidates_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_ingest_candidates_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
         except (RuntimeError, ValueError) as error:
             print(f"error: {error}", file=sys.stderr)
             return 2
@@ -1861,8 +2552,8 @@ def command_duplicates(args: argparse.Namespace) -> int:
     if args.report:
         report_date = args.date or date.today().isoformat()
         try:
-            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
-            report_path = unique_duplicates_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_duplicates_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
         except (RuntimeError, ValueError) as error:
             print(f"error: {error}", file=sys.stderr)
             return 2
@@ -2039,6 +2730,146 @@ def command_author_fix(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# bare-link-fix: rewrite ambiguous [[wikilinks]] to explicit relative links
+# ---------------------------------------------------------------------------
+
+
+def collect_ambiguous_bare_links(
+    root: Path, wiki_dir: Path, raw_dir: Path
+) -> tuple[list[IndexIssue], dict[str, list[PageRecord]]]:
+    """Return ambiguous-bare-link issues and a stem->pages lookup."""
+    lint = collect_index_lint(root, wiki_dir, raw_dir)
+    issues = [i for i in lint.issues if i.code == "ambiguous-bare-link"]
+    pages = load_wiki_pages(root, wiki_dir)
+    by_stem: dict[str, list[PageRecord]] = {}
+    for page in pages:
+        by_stem.setdefault(page.stem, []).append(page)
+    return issues, by_stem
+
+
+def resolve_bare_link_replacement(
+    index_file: Path, target_stem: str, pages_by_stem: dict[str, list[PageRecord]]
+) -> str | None:
+    """Build the explicit Markdown link text for a bare wikilink target.
+
+    Returns e.g. ``[title](<../AI 工具/page.md>)`` or *None* if the target
+    cannot be resolved to a single wiki page.
+    """
+    candidates = pages_by_stem.get(target_stem, [])
+    # Filter out index pages – the link should point to a content page.
+    non_index = [p for p in candidates if not is_index_page(p)]
+    if len(non_index) == 1:
+        target_page = non_index[0]
+    elif len(candidates) == 1:
+        target_page = candidates[0]
+    else:
+        return None  # ambiguous or missing
+
+    # Compute a relative path from the index file's directory to the target.
+    try:
+        rel = Path(target_page.path.resolve()).relative_to(
+            index_file.parent.resolve()
+        )
+    except ValueError:
+        # Fallback: use os-level relpath
+        import os
+
+        rel = Path(os.path.relpath(target_page.path.resolve(), index_file.parent.resolve()))
+
+    rel_posix = rel.as_posix()
+    return f"[{target_stem}](<{rel_posix}>)"
+
+
+def fix_bare_links_in_file(
+    file_path: Path,
+    targets: set[str],
+    pages_by_stem: dict[str, list[PageRecord]],
+    dry_run: bool = True,
+) -> list[tuple[str, str, str]]:
+    """Rewrite ambiguous bare wikilinks in *file_path*.
+
+    Returns a list of (target, old_fragment, new_fragment) for each replacement.
+    """
+    text = read_text(file_path)
+    replacements: list[tuple[str, str, str]] = []
+
+    def _replace(match: re.Match[str]) -> str:
+        inner = match.group(1)
+        target = wikilink_target(inner)
+        if target not in targets:
+            return match.group(0)
+        new_link = resolve_bare_link_replacement(file_path, target, pages_by_stem)
+        if new_link is None:
+            return match.group(0)
+        replacements.append((target, match.group(0), new_link))
+        return new_link
+
+    new_text = WIKILINK_RE.sub(_replace, text)
+
+    if not dry_run and replacements:
+        file_path.write_text(new_text, encoding="utf-8")
+
+    return replacements
+
+
+def command_bare_link_fix(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    wiki_dir = Path(args.wiki_dir)
+    raw_dir = Path(args.raw_dir)
+
+    issues, pages_by_stem = collect_ambiguous_bare_links(root, wiki_dir, raw_dir)
+
+    if not issues:
+        print("No ambiguous bare links to fix.")
+        return 0
+
+    # Group issues by file so we process each file once.
+    from collections import defaultdict
+
+    by_file: dict[str, set[str]] = defaultdict(set)
+    for issue in issues:
+        by_file[issue.path].add(issue.target)
+
+    dry_run = not args.apply
+    mode = "DRY RUN" if dry_run else "APPLYING"
+    print(f"[{mode}] Found {len(issues)} ambiguous bare links across {len(by_file)} files\n")
+
+    total_fixed = 0
+    all_results: list[tuple[str, str, str, str]] = []  # (file, target, old, new)
+    errors: list[tuple[str, str]] = []
+
+    for rel_path, targets in sorted(by_file.items()):
+        file_path = root / rel_path
+        try:
+            replacements = fix_bare_links_in_file(
+                file_path, targets, pages_by_stem, dry_run=dry_run
+            )
+            for target, old, new in replacements:
+                total_fixed += 1
+                all_results.append((rel_path, target, old, new))
+        except Exception as exc:
+            errors.append((rel_path, str(exc)))
+            print(f"  ERROR: {rel_path}: {exc}")
+
+    # Print results
+    for rel_path, target, old, new in all_results:
+        verb = "WOULD FIX" if dry_run else "FIXED"
+        print(f"  [{verb}] {rel_path}")
+        print(f"    {old} -> {new}")
+
+    # Verify that resolved paths point to real files
+    unresolved = len(issues) - total_fixed
+    print(f"\n{'Would fix' if dry_run else 'Fixed'}: {total_fixed}/{len(issues)}")
+    if unresolved:
+        print(f"Unresolved (ambiguous or missing): {unresolved}")
+    if errors:
+        print(f"Errors: {len(errors)}")
+    if dry_run and total_fixed:
+        print("\nRe-run with --apply to write changes.")
+    return 0
+
+
 @dataclass(frozen=True)
 class CanonicalGuardIssue:
     canonical: str  # repo-relative canonical path (forward slashes)
@@ -2157,8 +2988,8 @@ def command_canonical_guard(args: argparse.Namespace) -> int:
     if args.report:
         report_date = args.date or date.today().isoformat()
         try:
-            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
-            report_path = unique_canonical_guard_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_canonical_guard_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
         except (RuntimeError, ValueError) as error:
             print(f"error: {error}", file=sys.stderr)
             return 2
@@ -2186,23 +3017,41 @@ class ScanResult:
     status_audit: StatusAudit
     canonical_guard: CanonicalGuardResult
     index_lint: IndexLint
+    xref_lint: XrefLint
+    readability_lint: ReadabilityLint
+    tags_lint: TagsLint
     coverage: CoverageResult
     duplicates: DuplicatesResult
     blocked: list[BlockedRecord]
+    inject_pending: InjectPendingResult | None = None
 
 
 def _section_summary(name: str, errors: int = 0, warnings: int = 0, info: int = 0) -> ScanSectionSummary:
     return ScanSectionSummary(name=name, errors=errors, warnings=warnings, info=info)
 
 
-def collect_scan(root: Path, wiki_dir: Path, raw_dir: Path) -> ScanResult:
+def collect_scan(
+    root: Path,
+    wiki_dir: Path,
+    raw_dir: Path,
+    pending_dir: Path | None = None,
+) -> ScanResult:
+    ip = (
+        collect_inject_pending(pending_dir, root, wiki_dir)
+        if pending_dir is not None
+        else None
+    )
     return ScanResult(
         status_audit=collect_status_audit(root, wiki_dir),
         canonical_guard=collect_canonical_guard(root, wiki_dir),
         index_lint=collect_index_lint(root, wiki_dir, raw_dir),
+        xref_lint=collect_xref_lint(root, wiki_dir, raw_dir),
+        readability_lint=collect_readability_lint(root, wiki_dir),
+        tags_lint=collect_tags_lint(root, wiki_dir),
         coverage=collect_coverage(root, wiki_dir, raw_dir),
         duplicates=collect_duplicates(root, wiki_dir),
         blocked=collect_blocked_records(root, wiki_dir, raw_dir),
+        inject_pending=ip,
     )
 
 
@@ -2220,22 +3069,37 @@ def _scan_section_summaries(result: ScanResult) -> list[ScanSectionSummary]:
     lint_errors = sum(1 for i in il.issues if i.code in ("literal-raw-link", "missing-target"))
     lint_warnings = sum(1 for i in il.issues if i.code in ("ambiguous-bare-link", "stub-marker-mismatch"))
 
+    xl = result.xref_lint
+    xref_warnings = xl.broken_links + xl.broken_xref
+    xref_info = xl.orphan_pages + xl.missing_xref
+
     blocked_nonlingorm = sum(1 for b in bl if b.policy_bucket == "blocked-nonlingorm")
     blocked_lingorm = sum(1 for b in bl if b.policy_bucket == "excluded-lingorm")
 
-    return [
+    summaries = [
         _section_summary("status-audit", errors=status_errors),
         _section_summary("author-validation", errors=author_errors),
         _section_summary("canonical-guard", errors=len(cg.stale_conflicts)),
         _section_summary("index-lint", errors=lint_errors, warnings=lint_warnings),
+        _section_summary("xref-lint", warnings=xref_warnings, info=xref_info),
+        _section_summary("readability-lint", info=len(result.readability_lint.issues)),
+        _section_summary("tags-lint", info=len(result.tags_lint.issues)),
         _section_summary("coverage", info=len(cv.raw_only), warnings=len(cv.raw_missing_url)),
         _section_summary("duplicates", errors=sum(len(g.pages) for g in dp.groups)),
         _section_summary("blocked-nonlingorm", warnings=blocked_nonlingorm),
         _section_summary("blocked-lingorm", info=blocked_lingorm),
     ]
+    if result.inject_pending is not None:
+        ip = result.inject_pending
+        summaries.append(_section_summary(
+            "inject-pending",
+            info=len(ip.eligible),
+            warnings=len(ip.duplicate_match),
+        ))
+    return summaries
 
 
-def render_scan_report(result: ScanResult, report_date: str) -> str:
+def render_scan_report(result: ScanResult, report_date: str, report_dir_rel: str = REPORT_DIR_DEFAULT) -> str:
     sections = _scan_section_summaries(result)
     total_e = sum(s.errors for s in sections)
     total_w = sum(s.warnings for s in sections)
@@ -2299,6 +3163,69 @@ def render_scan_report(result: ScanResult, report_date: str) -> str:
                 lines.append(f"- ... and {len(issues) - 15} more")
             lines.append("")
 
+    xl = result.xref_lint
+    if xl.issues:
+        lines.extend(["## Cross-Reference Lint", ""])
+        lines.append(f"- Broken wikilinks: {xl.broken_links}")
+        lines.append(f"- Orphan pages: {xl.orphan_pages}")
+        lines.append(f"- Broken Cross References: {xl.broken_xref}")
+        lines.append(f"- Missing Cross References: {xl.missing_xref}")
+        lines.append("")
+        broken = [i for i in xl.issues if i.code in ("broken-wikilink", "broken-xref-section")]
+        if broken:
+            lines.append("### Broken Links")
+            lines.append("")
+            for issue in broken[:20]:
+                lines.append(f"- `{issue.path}`:{issue.line} → {issue.target}: {issue.detail}")
+            if len(broken) > 20:
+                lines.append(f"- ... and {len(broken) - 20} more")
+            lines.append("")
+        orphans = [i for i in xl.issues if i.code == "orphan-page"]
+        if orphans:
+            lines.append(f"### Orphan Pages ({len(orphans)})")
+            lines.append("")
+            for issue in orphans[:30]:
+                lines.append(f"- `{issue.path}`")
+            if len(orphans) > 30:
+                lines.append(f"- ... and {len(orphans) - 30} more")
+            lines.append("")
+        missing = [i for i in xl.issues if i.code == "missing-xref-section"]
+        if missing:
+            lines.append(f"### Missing Cross References ({len(missing)})")
+            lines.append("")
+            for issue in missing[:30]:
+                lines.append(f"- `{issue.path}`")
+            if len(missing) > 30:
+                lines.append(f"- ... and {len(missing) - 30} more")
+            lines.append("")
+
+    rl = result.readability_lint
+    if rl.issues:
+        lines.extend(["## Readability Lint", ""])
+        lines.append(f"- Pages with readability issues: {len(rl.issues)} of {rl.scanned_pages} scanned")
+        lines.append(f"  - single-dump: {rl.single_dump}")
+        lines.append(f"  - no-headings: {rl.no_headings}")
+        lines.append(f"  - social-tone: {rl.social_tone}")
+        lines.append(f"  - no-formatting: {rl.no_formatting}")
+        lines.append("")
+        for issue in rl.issues[:20]:
+            lines.append(f"- `{issue.path}` [{issue.code}]: {issue.detail}")
+        if len(rl.issues) > 20:
+            lines.append(f"- ... and {len(rl.issues) - 20} more")
+        lines.append("")
+
+    tl = result.tags_lint
+    if tl.issues:
+        lines.extend(["## Tags Lint", ""])
+        lines.append(f"- Scanned {tl.total_pages} pages: {tl.pages_with_nonempty_tags} with tags, {tl.pages_with_empty_tags} empty, {tl.pages_without_tags_field} missing field.")
+        lines.append(f"- Total issues: {len(tl.issues)} (missing-field: {tl.missing_field}, empty: {tl.empty_tags}, singleton: {tl.singleton_tags})")
+        lines.append("")
+        for issue in tl.issues[:20]:
+            lines.append(f"- `{issue.path}` [{issue.code}] — {issue.detail}")
+        if len(tl.issues) > 20:
+            lines.append(f"- ... and {len(tl.issues) - 20} more (see `tags-lint --report`)")
+        lines.append("")
+
     cv = result.coverage
     lines.extend([
         "## Coverage",
@@ -2345,11 +3272,32 @@ def render_scan_report(result: ScanResult, report_date: str) -> str:
         lines.append(f"{len(lingorm)} LingOrm stubs excluded by policy.")
         lines.append("")
 
+    if result.inject_pending is not None:
+        ip = result.inject_pending
+        lines += [
+            "## Inject Pending",
+            "",
+            f"- Eligible for injection: {len(ip.eligible)}",
+            f"- Already filled: {len(ip.already_filled)}",
+            f"- LingOrm skipped: {len(ip.lingorm_skipped)}",
+            f"- No wiki match: {len(ip.no_match)}",
+            f"- Duplicate match: {len(ip.duplicate_match)}",
+            f"- Missing URL: {len(ip.pending_missing_url)}",
+            "",
+        ]
+        if ip.eligible:
+            lines += ["### Eligible", ""]
+            for entry in ip.eligible:
+                lines.append(
+                    f"- `{entry.pending.rel_path}` → `{entry.wiki_page.rel_path}` [{entry.new_status}]"
+                )
+            lines.append("")
+
     lines.extend([
         "## Suggested Next Agent Prompt",
         "",
         "```text",
-        f"請依照 tasks/maintenance-reports/maintenance-report-{report_date}.md，只處理 Errors。",
+        f"請依照 {report_dir_rel}/{MAINTENANCE_REPORTS_DIR}/maintenance-report-{report_date}.md，只處理 Errors。",
         "LingOrm stub 保留。",
         "先提出修復計畫，不要直接大批刪檔。",
         "```",
@@ -2373,9 +3321,10 @@ def command_scan(args: argparse.Namespace) -> int:
     root = args.root.resolve()
     wiki_dir = Path(args.wiki_dir)
     raw_dir = Path(args.raw_dir)
+    pending_dir = Path(args.pending_dir).resolve() if args.pending_dir else None
 
     print("scan: running all report-only checks...")
-    result = collect_scan(root, wiki_dir, raw_dir)
+    result = collect_scan(root, wiki_dir, raw_dir, pending_dir=pending_dir)
     sections = _scan_section_summaries(result)
 
     total_e = sum(s.errors for s in sections)
@@ -2391,13 +3340,1153 @@ def command_scan(args: argparse.Namespace) -> int:
     if args.report:
         report_date = args.date or date.today().isoformat()
         try:
-            tasks_dir = resolve_tasks_dir(root, args.tasks_dir)
-            report_path = unique_scan_report_path(tasks_dir / MAINTENANCE_REPORTS_DIR, report_date)
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_scan_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
         except (RuntimeError, ValueError) as error:
             print(f"error: {error}", file=sys.stderr)
             return 2
-        write_text(report_path, render_scan_report(result, report_date))
+        write_text(report_path, render_scan_report(result, report_date, report_dir_rel=args.report_dir))
         print(f"wrote {normalize_rel_path(report_path, root)}")
+
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# pending-match: compare external pending digest URLs against wiki URLs
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PendingRecord:
+    path: Path
+    rel_path: str          # relative to pending_dir
+    url: str
+    title: str
+
+
+def load_pending_records(pending_dir: Path) -> list[PendingRecord]:
+    """Load all .md files from an external pending digest directory."""
+    records: list[PendingRecord] = []
+    if not pending_dir.exists():
+        return records
+    for path in sorted(pending_dir.rglob("*.md")):
+        if any(part.startswith(".") for part in path.relative_to(pending_dir).parts):
+            continue
+        text = read_text(path)
+        frontmatter, _body = parse_frontmatter(text)
+        url = normalize_url(frontmatter.get("url") or frontmatter.get("網址") or "")
+        title = frontmatter.get("title") or path.stem
+        try:
+            rel = path.relative_to(pending_dir).as_posix()
+        except ValueError:
+            rel = path.name
+        records.append(PendingRecord(path=path, rel_path=rel, url=url, title=title))
+    return records
+
+
+@dataclass(frozen=True)
+class PendingMatchResult:
+    matched_one: list[tuple[PendingRecord, PageRecord]]       # exactly 1 wiki match
+    no_match: list[PendingRecord]                             # 0 wiki matches
+    duplicate_match: list[tuple[PendingRecord, list[PageRecord]]]  # >1 wiki matches
+    pending_missing_url: list[PendingRecord]                  # pending has no url
+
+
+def collect_pending_match(pending_dir: Path, root: Path, wiki_dir: Path) -> PendingMatchResult:
+    pending_records = load_pending_records(pending_dir)
+    wiki_pages = load_wiki_pages(root, wiki_dir)
+
+    wiki_by_url: dict[str, list[PageRecord]] = {}
+    for page in wiki_pages:
+        if page.url:
+            wiki_by_url.setdefault(page.url, []).append(page)
+
+    matched_one: list[tuple[PendingRecord, PageRecord]] = []
+    no_match: list[PendingRecord] = []
+    duplicate_match: list[tuple[PendingRecord, list[PageRecord]]] = []
+    pending_missing_url: list[PendingRecord] = []
+
+    for record in pending_records:
+        if not record.url:
+            pending_missing_url.append(record)
+            continue
+        wiki_hits = wiki_by_url.get(record.url, [])
+        if len(wiki_hits) == 0:
+            no_match.append(record)
+        elif len(wiki_hits) == 1:
+            matched_one.append((record, wiki_hits[0]))
+        else:
+            duplicate_match.append((record, wiki_hits))
+
+    return PendingMatchResult(
+        matched_one=matched_one,
+        no_match=no_match,
+        duplicate_match=duplicate_match,
+        pending_missing_url=pending_missing_url,
+    )
+
+
+def render_pending_match_report(result: PendingMatchResult, report_date: str, pending_dir: Path) -> str:
+    total = (
+        len(result.matched_one)
+        + len(result.no_match)
+        + len(result.duplicate_match)
+        + len(result.pending_missing_url)
+    )
+    lines = [
+        f"# Pending Digest Match Report - {report_date}",
+        "",
+        f"Pending directory: `{pending_dir.as_posix()}`",
+        "",
+        "This is a report-only scan. No wiki files were modified.",
+        "",
+        "## Summary",
+        "",
+        f"- Total pending files: {total}",
+        f"- Matched one wiki page: {len(result.matched_one)}",
+        f"- No wiki match: {len(result.no_match)}",
+        f"- Duplicate wiki match: {len(result.duplicate_match)}",
+        f"- Pending missing URL: {len(result.pending_missing_url)}",
+        "",
+        "## Matched One Wiki Page",
+        "",
+    ]
+    if result.matched_one:
+        lines.extend(["| Pending File | Wiki Page |", "|---|---|"])
+        for pending, page in result.matched_one:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | `{markdown_cell(page.rel_path)}` |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## No Wiki Match", ""])
+    if result.no_match:
+        lines.extend(["| Pending File | URL |", "|---|---|"])
+        for pending in result.no_match:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | {markdown_cell(pending.url)} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Duplicate Wiki Match", ""])
+    if result.duplicate_match:
+        lines.extend(["| Pending File | URL | Wiki Pages |", "|---|---|---|"])
+        for pending, pages in result.duplicate_match:
+            wiki_list = ", ".join(f"`{markdown_cell(p.rel_path)}`" for p in pages)
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | {markdown_cell(pending.url)} | {wiki_list} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Pending Missing URL", ""])
+    if result.pending_missing_url:
+        lines.extend(["| Pending File |", "|---|"])
+        for pending in result.pending_missing_url:
+            lines.append(f"| `{markdown_cell(pending.rel_path)}` |")
+    else:
+        lines.append("None.")
+
+    return "\n".join(lines)
+
+
+def unique_pending_match_report_path(report_dir: Path, report_date: str) -> Path:
+    first_path = report_dir / f"pending-match-{report_date}.md"
+    if not first_path.exists():
+        return first_path
+    for index in range(2, 1000):
+        path = report_dir / f"pending-match-{report_date}-{index}.md"
+        if not path.exists():
+            return path
+    raise RuntimeError(f"too many pending-match reports already exist for {report_date}")
+
+
+def command_pending_match(args: argparse.Namespace) -> int:
+    if not args.pending_dir:
+        print("error: --pending-dir is required", file=sys.stderr)
+        print("usage: pending-match --pending-dir PATH [--report]", file=sys.stderr)
+        return 2
+
+    root = args.root.resolve()
+    pending_dir = Path(args.pending_dir).resolve()
+
+    if not pending_dir.exists():
+        print(f"error: pending directory does not exist: {args.pending_dir}", file=sys.stderr)
+        return 2
+    if not pending_dir.is_dir():
+        print(f"error: pending-dir is not a directory: {args.pending_dir}", file=sys.stderr)
+        return 2
+
+    result = collect_pending_match(pending_dir, root, Path(args.wiki_dir))
+    total = (
+        len(result.matched_one)
+        + len(result.no_match)
+        + len(result.duplicate_match)
+        + len(result.pending_missing_url)
+    )
+
+    print("pending-match")
+    print(f"pending directory: {pending_dir.as_posix()}")
+    print(f"total pending files: {total}")
+    print(f"matched one wiki page: {len(result.matched_one)}")
+    for pending, page in result.matched_one[:20]:
+        print(f"  {pending.rel_path} -> {page.rel_path}")
+    if len(result.matched_one) > 20:
+        print(f"  ... and {len(result.matched_one) - 20} more")
+    print(f"no wiki match: {len(result.no_match)}")
+    for pending in result.no_match[:10]:
+        print(f"  {pending.rel_path} | {pending.url}")
+    if len(result.no_match) > 10:
+        print(f"  ... and {len(result.no_match) - 10} more")
+    print(f"duplicate wiki match: {len(result.duplicate_match)}")
+    for pending, pages in result.duplicate_match[:10]:
+        wiki_paths = ", ".join(p.rel_path for p in pages)
+        print(f"  {pending.rel_path} | {pending.url} | [{wiki_paths}]")
+    if len(result.duplicate_match) > 10:
+        print(f"  ... and {len(result.duplicate_match) - 10} more")
+    print(f"pending missing url: {len(result.pending_missing_url)}")
+    for pending in result.pending_missing_url[:10]:
+        print(f"  {pending.rel_path}")
+    if len(result.pending_missing_url) > 10:
+        print(f"  ... and {len(result.pending_missing_url) - 10} more")
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_pending_match_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
+        except (RuntimeError, ValueError) as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
+        write_text(report_path, render_pending_match_report(result, report_date, pending_dir))
+        print(f"wrote {normalize_rel_path(report_path, root)}")
+
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# inject-pending: inject content from pending digest files into stub wiki pages
+# ---------------------------------------------------------------------------
+
+_INJECT_STUB_MARKERS = [
+    "## Main Content\n\n（📌 待消化）",
+    "## Main Content\n（📌 待消化）",
+]
+
+_INJECT_LEVEL2_RE = re.compile(
+    r"```|❶|❷|❸|❹|❺|步驟\s*[：:]|Step\s+\d|第[一二三四五六七八九十]+步"
+    r"|^\d+\.\s|^[•▪▸]\s.*(?:指令|設定|安裝|執行)|如何[^嗎]|怎麼做"
+    r"|(?:N|[0-9]+)\s*個(?:方法|技巧|步驟|招|指令)",
+    re.MULTILINE,
+)
+
+
+def _determine_inject_status(body: str) -> str:
+    """Return 'wiki' if body is Level 2 (has code/steps/commands), else 'stub'."""
+    if _INJECT_LEVEL2_RE.search(body):
+        return "wiki"
+    if body.count("\n---\n") >= 2 and len(body) > 300:
+        return "wiki"
+    return "stub"
+
+
+@dataclass(frozen=True)
+class InjectPendingEntry:
+    pending: PendingRecord
+    wiki_page: PageRecord
+    pending_body: str       # body extracted from pending file (after frontmatter)
+    new_status: str         # "wiki" or "stub"
+
+
+@dataclass(frozen=True)
+class InjectPendingResult:
+    eligible: list[InjectPendingEntry]                              # stub marker found, ready to inject
+    already_filled: list[tuple[PendingRecord, PageRecord]]          # matched but no stub marker
+    lingorm_skipped: list[tuple[PendingRecord, PageRecord]]         # LingOrm pages always skipped
+    no_match: list[PendingRecord]                                   # pending url not in wiki
+    duplicate_match: list[tuple[PendingRecord, list[PageRecord]]]   # ambiguous
+    pending_missing_url: list[PendingRecord]                        # pending has no url
+
+
+def collect_inject_pending(pending_dir: Path, root: Path, wiki_dir: Path) -> InjectPendingResult:
+    """Build a report of which pending files would be injected into wiki stubs."""
+    pending_records = load_pending_records(pending_dir)
+    wiki_pages = load_wiki_pages(root, wiki_dir)
+
+    wiki_by_url: dict[str, list[PageRecord]] = {}
+    for page in wiki_pages:
+        if page.url:
+            wiki_by_url.setdefault(page.url, []).append(page)
+
+    eligible: list[InjectPendingEntry] = []
+    already_filled: list[tuple[PendingRecord, PageRecord]] = []
+    lingorm_skipped: list[tuple[PendingRecord, PageRecord]] = []
+    no_match: list[PendingRecord] = []
+    duplicate_match: list[tuple[PendingRecord, list[PageRecord]]] = []
+    pending_missing_url: list[PendingRecord] = []
+
+    for record in pending_records:
+        if not record.url:
+            pending_missing_url.append(record)
+            continue
+        wiki_hits = wiki_by_url.get(record.url, [])
+        if len(wiki_hits) == 0:
+            no_match.append(record)
+        elif len(wiki_hits) > 1:
+            duplicate_match.append((record, wiki_hits))
+        else:
+            wiki_page = wiki_hits[0]
+            # Skip LingOrm
+            if "LingOrm" in wiki_page.category or "LingOrm" in wiki_page.wiki_rel_path:
+                lingorm_skipped.append((record, wiki_page))
+                continue
+            # Read wiki file to check for stub marker
+            wiki_abs_path = root / wiki_page.rel_path
+            try:
+                wiki_text = read_text(wiki_abs_path)
+            except Exception:
+                no_match.append(record)
+                continue
+            has_stub = any(marker in wiki_text for marker in _INJECT_STUB_MARKERS)
+            if not has_stub:
+                already_filled.append((record, wiki_page))
+                continue
+            # Read pending body
+            pending_text = read_text(record.path)
+            _fm, pending_body = parse_frontmatter(pending_text)
+            new_status = _determine_inject_status(pending_body)
+            eligible.append(InjectPendingEntry(
+                pending=record,
+                wiki_page=wiki_page,
+                pending_body=pending_body,
+                new_status=new_status,
+            ))
+
+    return InjectPendingResult(
+        eligible=eligible,
+        already_filled=already_filled,
+        lingorm_skipped=lingorm_skipped,
+        no_match=no_match,
+        duplicate_match=duplicate_match,
+        pending_missing_url=pending_missing_url,
+    )
+
+
+def render_inject_pending_report(result: InjectPendingResult, report_date: str, pending_dir: Path) -> str:
+    lines = [
+        f"# Inject Pending Report - {report_date}",
+        "",
+        f"Pending directory: `{pending_dir.as_posix()}`",
+        "",
+        "## Summary",
+        "",
+        f"- Eligible for injection: {len(result.eligible)}",
+        f"- Already filled (no stub marker): {len(result.already_filled)}",
+        f"- LingOrm skipped: {len(result.lingorm_skipped)}",
+        f"- No wiki match: {len(result.no_match)}",
+        f"- Duplicate wiki match: {len(result.duplicate_match)}",
+        f"- Pending missing URL: {len(result.pending_missing_url)}",
+        "",
+        "## Eligible for Injection",
+        "",
+    ]
+    if result.eligible:
+        lines.extend(["| Pending File | Wiki Page | New Status |", "|---|---|---|"])
+        for entry in result.eligible:
+            lines.append(
+                f"| `{markdown_cell(entry.pending.rel_path)}` "
+                f"| `{markdown_cell(entry.wiki_page.rel_path)}` "
+                f"| {entry.new_status} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Already Filled", ""])
+    if result.already_filled:
+        lines.extend(["| Pending File | Wiki Page |", "|---|---|"])
+        for pending, page in result.already_filled:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | `{markdown_cell(page.rel_path)}` |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## LingOrm Skipped", ""])
+    if result.lingorm_skipped:
+        lines.extend(["| Pending File | Wiki Page |", "|---|---|"])
+        for pending, page in result.lingorm_skipped:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | `{markdown_cell(page.rel_path)}` |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## No Wiki Match", ""])
+    if result.no_match:
+        lines.extend(["| Pending File | URL |", "|---|---|"])
+        for pending in result.no_match:
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | {markdown_cell(pending.url)} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Duplicate Wiki Match", ""])
+    if result.duplicate_match:
+        lines.extend(["| Pending File | URL | Wiki Pages |", "|---|---|---|"])
+        for pending, pages in result.duplicate_match:
+            wiki_list = ", ".join(f"`{markdown_cell(p.rel_path)}`" for p in pages)
+            lines.append(
+                f"| `{markdown_cell(pending.rel_path)}` | {markdown_cell(pending.url)} | {wiki_list} |"
+            )
+    else:
+        lines.append("None.")
+
+    lines.extend(["", "## Pending Missing URL", ""])
+    if result.pending_missing_url:
+        lines.extend(["| Pending File |", "|---|"])
+        for pending in result.pending_missing_url:
+            lines.append(f"| `{markdown_cell(pending.rel_path)}` |")
+    else:
+        lines.append("None.")
+
+    return "\n".join(lines)
+
+
+def unique_inject_pending_report_path(report_dir: Path, report_date: str) -> Path:
+    first_path = report_dir / f"inject-pending-{report_date}.md"
+    if not first_path.exists():
+        return first_path
+    for index in range(2, 1000):
+        path = report_dir / f"inject-pending-{report_date}-{index}.md"
+        if not path.exists():
+            return path
+    raise RuntimeError(f"too many inject-pending reports already exist for {report_date}")
+
+
+def apply_inject_pending(
+    entries: list[InjectPendingEntry],
+    root: Path,
+    limit: int | None = None,
+    dry_run: bool = False,
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Inject content from pending files into matching wiki stubs.
+
+    Returns (injected_paths, errors) where injected_paths are repo-relative
+    paths (forward-slash) and errors are (path, message) pairs.
+    """
+    to_inject = entries[:limit] if limit is not None else entries
+    injected: list[str] = []
+    errors: list[tuple[str, str]] = []
+
+    for entry in to_inject:
+        wiki_path = root / entry.wiki_page.rel_path
+        # Safety: skip LingOrm
+        if "LingOrm" in entry.wiki_page.category or "LingOrm" in entry.wiki_page.wiki_rel_path:
+            errors.append((entry.wiki_page.rel_path, "LingOrm page — always skipped"))
+            continue
+        try:
+            wiki_text = read_text(wiki_path)
+        except Exception as exc:
+            errors.append((entry.wiki_page.rel_path, f"read error: {exc}"))
+            continue
+
+        # Replace stub marker
+        new_text = wiki_text
+        replaced = False
+        for marker in _INJECT_STUB_MARKERS:
+            if marker in new_text:
+                new_text = new_text.replace(marker, f"## Main Content\n\n{entry.pending_body}", 1)
+                replaced = True
+                break
+        if not replaced:
+            errors.append((entry.wiki_page.rel_path, "stub marker no longer present — already filled?"))
+            continue
+
+        # Update status field in frontmatter
+        new_text = re.sub(r"(status:\s*)stub", rf"\g<1>{entry.new_status}", new_text, count=1)
+
+        if not dry_run:
+            write_text(wiki_path, new_text)
+
+        injected.append(normalize_rel_path(wiki_path, root))
+
+    return injected, errors
+
+
+def command_inject_pending(args: argparse.Namespace) -> int:
+    if not args.pending_dir:
+        print("error: --pending-dir is required for inject-pending", file=sys.stderr)
+        return 1
+    pending_dir = Path(args.pending_dir).resolve()
+    if not pending_dir.exists():
+        print(f"error: pending directory does not exist: {args.pending_dir}", file=sys.stderr)
+        return 1
+    if not pending_dir.is_dir():
+        print(f"error: pending-dir is not a directory: {args.pending_dir}", file=sys.stderr)
+        return 1
+
+    root = args.root.resolve()
+    wiki_dir = Path(args.wiki_dir)
+    result = collect_inject_pending(pending_dir, root, wiki_dir)
+
+    apply_mode: bool = getattr(args, "apply", False)
+    limit: int | None = getattr(args, "limit", None)
+
+    print("inject-pending")
+    print(f"pending directory: {pending_dir.as_posix()}")
+    print(f"eligible for injection: {len(result.eligible)}")
+    for i, entry in enumerate(result.eligible[:30]):
+        print(f"  {entry.pending.rel_path} → {entry.wiki_page.rel_path} [{entry.new_status}]")
+    if len(result.eligible) > 30:
+        print(f"  ... and {len(result.eligible) - 30} more")
+    print(f"already filled: {len(result.already_filled)}")
+    print(f"LingOrm skipped: {len(result.lingorm_skipped)}")
+    print(f"no wiki match: {len(result.no_match)}")
+    print(f"duplicate match: {len(result.duplicate_match)}")
+    print(f"pending missing url: {len(result.pending_missing_url)}")
+
+    if apply_mode:
+        injected, errors = apply_inject_pending(
+            result.eligible, root, limit=limit, dry_run=False
+        )
+        print(f"\nInjected {len(injected)} pages.")
+        for path in injected:
+            print(f"  {path}")
+        if errors:
+            print(f"\nSkipped/errors ({len(errors)}):")
+            for path, msg in errors:
+                print(f"  {path}: {msg}")
+
+        if injected:
+            log_path = root / wiki_dir / "log.md"
+            today = date.today().isoformat()
+            log_entry = (
+                f"\n## [{today}] inject-pending | {len(injected)} pages injected by inject-pending --apply\n"
+            )
+            existing = read_text(log_path) if log_path.exists() else ""
+            write_text(log_path, existing.rstrip() + log_entry)
+            print(f"\nAppended log entry to {normalize_rel_path(log_path, root)}")
+            print(
+                f"\nReminder: Dashboard in 總索引.md needs manual update "
+                f"for any pages promoted to wiki."
+            )
+    else:
+        if result.eligible:
+            print("\nUse --apply to inject content into these stubs.")
+            print("Use --apply --limit N to cap batch size.")
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_inject_pending_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            write_text(report_path, render_inject_pending_report(result, report_date, pending_dir))
+            print(f"\nReport written: {normalize_rel_path(report_path, root)}")
+        except RuntimeError as exc:
+            print(f"warning: {exc}", file=sys.stderr)
+
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# promote-ready: find non-LingOrm stubs with substantial content
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PromoteReadyEntry:
+    page: PageRecord
+    body_length: int
+    heading_count: int
+    reason: str
+
+
+@dataclass(frozen=True)
+class PromoteReadyResult:
+    ready: list[PromoteReadyEntry]
+    blocked: list[PageRecord]   # empty body or URL-only — go to blocked, not ready
+
+
+PROMOTE_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
+PROMOTE_PLACEHOLDER_RE = re.compile(r"（📌\s*待消化）|\(📌\s*待消化\)|📌\s*待消化")
+
+
+def _count_body_headings(body: str) -> int:
+    return len(PROMOTE_HEADING_RE.findall(body))
+
+
+def _body_has_substantial_content(body: str) -> bool:
+    """Return True if body has real content (not just frontmatter lines or URLs)."""
+    meaningful: list[str] = []
+    for raw_line in body.replace("\r\n", "\n").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            continue
+        if line.startswith(("http://", "https://")):
+            continue
+        if line in {"[]", "[ ]", "---"}:
+            continue
+        if line in PLACEHOLDER_MARKERS:
+            continue
+        if line.startswith(("- [[", "* [[", "[[")):
+            continue
+        if line.startswith("- [") and "](" in line:
+            continue
+        meaningful.append(line)
+    total_chars = sum(len(line) for line in meaningful)
+    return total_chars >= 80 or len(meaningful) >= 3
+
+
+def collect_promote_ready(root: Path, wiki_dir: Path) -> PromoteReadyResult:
+    """Identify non-LingOrm stub pages ready for promotion."""
+    pages = load_wiki_pages(root, wiki_dir)
+    ready: list[PromoteReadyEntry] = []
+    blocked: list[PageRecord] = []
+
+    for page in pages:
+        # Only look at stub pages
+        if normalize_status(page.status) != "stub":
+            continue
+        # Skip index pages
+        if page.category == "index" or page.wiki_rel_path.startswith("index/"):
+            continue
+        # Skip LingOrm — per project rules they can stay stub forever
+        if "LingOrm" in page.category or "LingOrm" in page.wiki_rel_path:
+            continue
+
+        body = page.body
+        body_length = len(body)
+        heading_count = _count_body_headings(body)
+
+        # Pages with empty body or only URL go to blocked
+        if not body.strip() or (body_length < 30 and ("http://" in body or "https://" in body)):
+            blocked.append(page)
+            continue
+
+        # Pages with 待消化 marker are not ready
+        if PROMOTE_PLACEHOLDER_RE.search(body):
+            continue
+
+        # Readiness criteria (any one sufficient):
+        reasons: list[str] = []
+        if body_length > 300:
+            reasons.append(f"body>{300}chars")
+        if heading_count >= 2:
+            reasons.append(f"{heading_count}headings")
+        if _body_has_substantial_content(body) and body_length > 150:
+            reasons.append("substantial-content")
+
+        if reasons:
+            ready.append(PromoteReadyEntry(
+                page=page,
+                body_length=body_length,
+                heading_count=heading_count,
+                reason=", ".join(reasons),
+            ))
+
+    return PromoteReadyResult(ready=ready, blocked=blocked)
+
+
+def render_promote_ready_report(result: PromoteReadyResult, report_date: str) -> str:
+    lines = [
+        f"# Promote-Ready Stubs - {report_date}",
+        "",
+        "This is a report-only scan. No wiki files were modified.",
+        "LingOrm pages are excluded per project rules.",
+        "",
+        "## Summary",
+        "",
+        f"- Ready to promote: {len(result.ready)}",
+        f"- Blocked (empty/URL-only body): {len(result.blocked)}",
+        "",
+        "## Ready to Promote",
+        "",
+    ]
+    if result.ready:
+        lines.extend(["| Page | Body chars | Headings | Reason |", "|---|---:|---:|---|"])
+        for entry in result.ready:
+            path = markdown_cell(entry.page.rel_path)
+            lines.append(
+                f"| `{path}` | {entry.body_length} | {entry.heading_count} | {markdown_cell(entry.reason)} |"
+            )
+    else:
+        lines.append("No stub pages ready for promotion detected.")
+
+    lines.extend(["", "## Blocked (empty or URL-only body)", ""])
+    if result.blocked:
+        lines.extend(["| Page | Category |", "|---|---|"])
+        for page in result.blocked:
+            lines.append(
+                f"| `{markdown_cell(page.rel_path)}` | {markdown_cell(page.category or '(root)')} |"
+            )
+    else:
+        lines.append("None.")
+
+    if result.ready:
+        lines.extend([
+            "",
+            "> Use `--apply` to promote these pages (changes `status: stub` → `status: wiki` and removes stub markers from index files).",
+            "> Use `--apply --limit N` to cap the number of pages promoted.",
+        ])
+
+    return "\n".join(lines)
+
+
+# Regex: matches [[stem]] or [[stem|alias]] followed by the stub marker.
+# Also matches [stem](<../path>) style relative links.
+_STUB_MARKER_WIKILINK_RE_TEMPLATE = r'(\[\[{stem}[^\]]*\]\])\s*（📌 stub）'
+_STUB_MARKER_RELLINK_RE_TEMPLATE = r'(\[{stem}\]\(<[^>]*>\))\s*（📌 stub）'
+
+
+def _build_stub_marker_patterns(stem: str) -> list[re.Pattern[str]]:
+    escaped = re.escape(stem)
+    return [
+        re.compile(_STUB_MARKER_WIKILINK_RE_TEMPLATE.format(stem=escaped)),
+        re.compile(_STUB_MARKER_RELLINK_RE_TEMPLATE.format(stem=escaped)),
+    ]
+
+
+def _remove_stub_marker_from_index_files(
+    wiki_dir: Path, stem: str, dry_run: bool = False
+) -> list[Path]:
+    """Strip （📌 stub） from all index files that reference *stem*.
+
+    Returns list of index files modified (or that would be modified in dry-run).
+    """
+    index_dir = wiki_dir / "index"
+    if not index_dir.is_dir():
+        return []
+
+    patterns = _build_stub_marker_patterns(stem)
+    modified: list[Path] = []
+
+    for index_path in sorted(index_dir.glob("*.md")):
+        text = read_text(index_path)
+        new_text = text
+        for pattern in patterns:
+            new_text = pattern.sub(r'\1', new_text)
+        if new_text != text:
+            if not dry_run:
+                write_text(index_path, new_text)
+            modified.append(index_path)
+
+    return modified
+
+
+def _promote_stub_to_wiki(page_path: Path, dry_run: bool = False) -> bool:
+    """Change `status: stub` → `status: wiki` in *page_path* frontmatter.
+
+    Returns True if the file was (or would be) changed.
+    Raises ValueError if the file does not have `status: stub`.
+    """
+    text = read_text(page_path)
+    # Match status line in frontmatter — look for `status: stub` (with optional quotes)
+    status_re = re.compile(
+        r'^(status:\s*)([\'"]?)stub([\'"]?\s*)$',
+        re.MULTILINE | re.IGNORECASE,
+    )
+    match = status_re.search(text)
+    if not match:
+        raise ValueError(f"no 'status: stub' found in frontmatter of {page_path}")
+
+    new_text = status_re.sub(r'\1\2wiki\3', text, count=1)
+    if new_text == text:
+        return False
+    if not dry_run:
+        write_text(page_path, new_text)
+    return True
+
+
+def apply_promote_ready(
+    entries: list[PromoteReadyEntry],
+    root: Path,
+    wiki_dir: Path,
+    limit: int | None,
+    dry_run: bool = False,
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Promote up to *limit* stub pages to wiki status.
+
+    *wiki_dir* may be relative (to *root*) or absolute.
+    Returns (promoted_paths, errors) where promoted_paths are repo-relative
+    paths (forward-slash) and errors are (path, message) pairs.
+    """
+    to_promote = entries[:limit] if limit is not None else list(entries)
+    promoted: list[str] = []
+    errors: list[tuple[str, str]] = []
+
+    # Accept either relative or absolute wiki_dir.
+    wiki_abs = wiki_dir if wiki_dir.is_absolute() else (root / wiki_dir).resolve()
+
+    for entry in to_promote:
+        page = entry.page
+        # Safety: skip if not actually stub (race or stale data)
+        if normalize_status(page.status) != "stub":
+            errors.append((page.rel_path, "status is not stub — skipped"))
+            continue
+        # Safety: skip LingOrm
+        if "LingOrm" in page.wiki_rel_path or "LingOrm" in page.category:
+            errors.append((page.rel_path, "LingOrm page — always skipped"))
+            continue
+
+        page_path = root / page.rel_path
+        try:
+            changed = _promote_stub_to_wiki(page_path, dry_run=dry_run)
+        except Exception as exc:
+            errors.append((page.rel_path, str(exc)))
+            continue
+
+        if changed:
+            _remove_stub_marker_from_index_files(wiki_abs, page.stem, dry_run=dry_run)
+            promoted.append(page.rel_path)
+
+    return promoted, errors
+
+
+def unique_promote_ready_report_path(report_dir: Path, report_date: str) -> Path:
+    first_path = report_dir / f"promote-ready-{report_date}.md"
+    if not first_path.exists():
+        return first_path
+    for index in range(2, 1000):
+        path = report_dir / f"promote-ready-{report_date}-{index}.md"
+        if not path.exists():
+            return path
+    raise RuntimeError(f"too many promote-ready reports already exist for {report_date}")
+
+
+def command_promote_ready(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    wiki_dir = Path(args.wiki_dir)
+    result = collect_promote_ready(root, wiki_dir)
+
+    apply_mode: bool = getattr(args, "apply", False)
+    limit: int | None = getattr(args, "limit", None)
+
+    print("promote-ready")
+    print(f"ready to promote: {len(result.ready)}")
+    for entry in result.ready[:30]:
+        print(f"  {entry.page.rel_path} [body={entry.body_length} headings={entry.heading_count}] {entry.reason}")
+    if len(result.ready) > 30:
+        print(f"  ... and {len(result.ready) - 30} more")
+    print(f"blocked (empty/url-only): {len(result.blocked)}")
+
+    if apply_mode:
+        promoted, errors = apply_promote_ready(
+            result.ready, root, wiki_dir, limit=limit, dry_run=False
+        )
+        print(f"\nPromoted {len(promoted)} pages.")
+        for path in promoted:
+            print(f"  {path}")
+        if errors:
+            print(f"\nSkipped/errors ({len(errors)}):")
+            for path, msg in errors:
+                print(f"  {path}: {msg}")
+
+        if promoted:
+            # Append to log
+            log_path = root / wiki_dir / "log.md"
+            today = date.today().isoformat()
+            log_entry = (
+                f"\n## [{today}] promote | {len(promoted)} pages promoted by promote-ready --apply\n"
+            )
+            existing = read_text(log_path) if log_path.exists() else ""
+            write_text(log_path, existing.rstrip() + log_entry)
+            print(f"\nAppended log entry to {normalize_rel_path(log_path, root)}")
+
+            print(
+                f"\nReminder: Dashboard in 總索引.md needs manual update "
+                f"(+{len(promoted)} wiki, -{len(promoted)} stub for affected category)."
+            )
+
+    if args.report:
+        report_date = args.date or date.today().isoformat()
+        try:
+            report_dir = resolve_report_dir(root, args.report_dir)
+            report_path = unique_promote_ready_report_path(report_dir / MAINTENANCE_REPORTS_DIR, report_date)
+        except (RuntimeError, ValueError) as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
+        write_text(report_path, render_promote_ready_report(result, report_date))
+        print(f"wrote {normalize_rel_path(report_path, root)}")
+
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# audit-list: list open items from audit/*.md
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AuditItem:
+    filename: str
+    severity: str
+    target: str
+    comment_first_line: str
+
+
+@dataclass(frozen=True)
+class AuditResolveEntry:
+    filename: str
+    original_path: Path      # audit/<filename>
+    resolved_path: Path      # audit/resolved/<filename> (or with -2/-3 suffix on collision)
+    summary: str
+    date: str                # YYYY-MM-DD
+    had_status: bool         # whether frontmatter already had a status field
+
+
+def _unique_resolved_path(resolved_dir: Path, filename: str) -> Path:
+    """Generate a unique path in resolved_dir, appending -2, -3, etc. if collision."""
+    base = resolved_dir / filename
+    if not base.exists():
+        return base
+    stem = Path(filename).stem
+    suffix = Path(filename).suffix
+    for i in range(2, 1000):
+        candidate = resolved_dir / f"{stem}-{i}{suffix}"
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError(f"too many collision variants for {filename}")
+
+
+def _rewrite_frontmatter_for_resolve(text: str, resolve_date: str) -> str:
+    """Update or add frontmatter: set status=resolved, add resolved=date."""
+    text_stripped = text.lstrip("﻿")
+
+    if not text_stripped.startswith("---"):
+        new_fm = f"---\nstatus: resolved\nresolved: {resolve_date}\n---\n\n"
+        return new_fm + text_stripped
+
+    lines = text_stripped.splitlines(keepends=True)
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        new_fm = f"---\nstatus: resolved\nresolved: {resolve_date}\n---\n\n"
+        return new_fm + text_stripped
+
+    end_index = None
+    for i, line in enumerate(lines[1:], start=1):
+        if line.rstrip("\r\n") == "---":
+            end_index = i
+            break
+
+    if end_index is None:
+        new_fm = f"---\nstatus: resolved\nresolved: {resolve_date}\n---\n\n"
+        return new_fm + text_stripped
+
+    fm_lines = list(lines[1:end_index])
+    body_lines = lines[end_index + 1:]
+
+    status_set = False
+    new_fm_lines: list[str] = []
+    for line in fm_lines:
+        if ":" in line:
+            key, _ = line.split(":", 1)
+            if key.strip() == "status":
+                new_fm_lines.append("status: resolved\n")
+                status_set = True
+                continue
+        new_fm_lines.append(line)
+
+    if not status_set:
+        new_fm_lines.append("status: resolved\n")
+
+    has_resolved_key = any(
+        ":" in ln and ln.split(":", 1)[0].strip() == "resolved"
+        for ln in new_fm_lines
+    )
+    if not has_resolved_key:
+        new_fm_lines.append(f"resolved: {resolve_date}\n")
+
+    return "---\n" + "".join(new_fm_lines) + "---\n" + "".join(body_lines)
+
+
+def _append_resolution_section(text: str, summary: str, resolve_date: str) -> str:
+    """Append # Resolution section to file content."""
+    resolution = f"\n\n# Resolution\n\nResolved: {resolve_date}\nSummary: {summary}\n"
+    return text.rstrip() + resolution
+
+
+def collect_audit_resolve(
+    audit_dir: Path,
+    filenames: list[str],
+    summary: str,
+    resolve_date: str,
+) -> list[AuditResolveEntry]:
+    """Validate and prepare resolution entries. Raises ValueError for any invalid file."""
+    resolved_dir = audit_dir / "resolved"
+    entries: list[AuditResolveEntry] = []
+
+    for filename in filenames:
+        original_path = audit_dir / filename
+        if not original_path.exists():
+            if (resolved_dir / filename).exists():
+                raise ValueError(f"{filename} already resolved")
+            raise ValueError(f"audit/{filename} not found")
+        if (resolved_dir / filename).exists():
+            raise ValueError(f"{filename} already resolved")
+
+        text = read_text(original_path)
+        frontmatter, _ = parse_frontmatter(text)
+        status = normalize_status(frontmatter.get("status", ""))
+        if status == "resolved":
+            raise ValueError(f"{filename} already marked resolved")
+
+        had_status = "status" in frontmatter
+        resolved_path = _unique_resolved_path(resolved_dir, filename)
+
+        entries.append(AuditResolveEntry(
+            filename=filename,
+            original_path=original_path,
+            resolved_path=resolved_path,
+            summary=summary,
+            date=resolve_date,
+            had_status=had_status,
+        ))
+
+    return entries
+
+
+def apply_audit_resolve(
+    entries: list[AuditResolveEntry],
+    audit_dir: Path,
+    log_path: Path,
+) -> None:
+    """Move files to resolved/, update frontmatter, append log.md."""
+    resolved_dir = audit_dir / "resolved"
+    resolved_dir.mkdir(parents=True, exist_ok=True)
+
+    for entry in entries:
+        text = read_text(entry.original_path)
+        text = _rewrite_frontmatter_for_resolve(text, entry.date)
+        text = _append_resolution_section(text, entry.summary, entry.date)
+        write_text(entry.resolved_path, text)
+        try:
+            entry.original_path.unlink()
+        except OSError as exc:
+            entry.resolved_path.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"could not delete {entry.original_path.name} after writing resolved copy: {exc}"
+            ) from exc
+        log_entry = (
+            f"\n## [{entry.date}] audit-resolve | {entry.filename} | {entry.summary}\n"
+        )
+        existing = read_text(log_path) if log_path.exists() else ""
+        write_text(log_path, existing.rstrip() + log_entry)
+
+
+def load_audit_items(audit_dir: Path) -> list[AuditItem]:
+    """Parse audit/*.md files for severity, target, and first comment line."""
+    items: list[AuditItem] = []
+    for path in sorted(audit_dir.glob("*.md")):
+        text = read_text(path)
+        frontmatter, body = parse_frontmatter(text)
+        severity = frontmatter.get("severity", "").strip()
+        target = frontmatter.get("target", "").strip()
+        # First non-empty body line as comment preview
+        comment_first_line = ""
+        for raw_line in body.replace("\r\n", "\n").splitlines():
+            stripped = raw_line.strip()
+            if stripped and not stripped.startswith("#"):
+                comment_first_line = stripped[:120]
+                break
+        items.append(AuditItem(
+            filename=path.name,
+            severity=severity,
+            target=target,
+            comment_first_line=comment_first_line,
+        ))
+    return items
+
+
+def command_audit_list(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    audit_dir = root / "audit"
+    include_resolved: bool = getattr(args, "include_resolved", False)
+
+    if not audit_dir.exists() or not audit_dir.is_dir():
+        print("no audit directory")
+        return 0
+
+    items = load_audit_items(audit_dir)
+
+    resolved_dir = audit_dir / "resolved"
+    resolved_count = 0
+    resolved_items: list[AuditItem] = []
+    if resolved_dir.exists() and resolved_dir.is_dir():
+        resolved_items = load_audit_items(resolved_dir)
+        resolved_count = len(resolved_items)
+
+    print(f"audit-list: {len(items)} open item(s), {resolved_count} resolved")
+
+    if items:
+        print("")
+        for item in items:
+            severity_label = f"[{item.severity}] " if item.severity else ""
+            target_label = f"target: {item.target} | " if item.target else ""
+            comment = item.comment_first_line or "(no comment)"
+            print(f"  {item.filename}")
+            print(f"    {severity_label}{target_label}{comment}")
+
+    if include_resolved and resolved_items:
+        print("")
+        print("resolved:")
+        for item in resolved_items:
+            severity_label = f"[{item.severity}] " if item.severity else ""
+            target_label = f"target: {item.target} | " if item.target else ""
+            comment = item.comment_first_line or "(no comment)"
+            print(f"  {item.filename}")
+            print(f"    {severity_label}{target_label}{comment}")
+
+    return 0
+
+
+def command_audit_resolve(args: argparse.Namespace) -> int:
+    """CLI handler for audit-resolve: collect → print plan → optionally apply."""
+    root = args.root.resolve()
+    audit_dir = root / "audit"
+
+    if not audit_dir.exists():
+        print("error: audit/ directory not found", file=sys.stderr)
+        return 2
+
+    resolve_date = args.date or date.today().isoformat()
+    apply_mode: bool = getattr(args, "apply", False)
+
+    try:
+        entries = collect_audit_resolve(
+            audit_dir=audit_dir,
+            filenames=args.filename,
+            summary=args.summary,
+            resolve_date=resolve_date,
+        )
+    except ValueError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+
+    if not apply_mode:
+        print(f"audit-resolve (dry-run): {len(entries)} item(s)")
+        for i, entry in enumerate(entries, start=1):
+            resolved_rel = normalize_rel_path(entry.resolved_path, root)
+            had = "updating" if entry.had_status else "adding"
+            print(f"  [{i}] {entry.filename}")
+            print(f"      → would move to {resolved_rel}")
+            print(f'      → would append # Resolution: "{entry.summary}"')
+            print(f"      → would {had} status: open → resolved")
+            print(f"      → would append log.md entry")
+        return 0
+
+    log_path = root / Path(args.wiki_dir) / "log.md"
+    apply_audit_resolve(entries, audit_dir, log_path)
+
+    print(f"audit-resolve: {len(entries)} item(s) resolved")
+    for i, entry in enumerate(entries, start=1):
+        resolved_rel = normalize_rel_path(entry.resolved_path, root)
+        print(f"  [{i}] {entry.filename} → {resolved_rel}")
+        print(f"      log.md updated")
 
     return 0
 
@@ -2409,13 +4498,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Repository root. Defaults to current directory.")
     parser.add_argument("--wiki-dir", default=WIKI_DIR_DEFAULT, help="Wiki directory relative to root.")
     parser.add_argument("--raw-dir", default=RAW_DIR_DEFAULT, help="Raw directory relative to root.")
-    parser.add_argument("--tasks-dir", default=TASKS_DIR_DEFAULT, help="Tasks/report directory relative to root.")
+    parser.add_argument("--tasks-dir", default=TASKS_DIR_DEFAULT, help="Tasks directory (handoff, blocked-report) relative to root.")
+    parser.add_argument("--report-dir", default=REPORT_DIR_DEFAULT, help="Report output directory relative to root. Defaults to audit/.")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     scan = subparsers.add_parser("scan", help="Run all report-only checks and produce a combined maintenance report.")
     scan.add_argument("--report", action="store_true", help="Write a dated maintenance report Markdown file.")
     scan.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    scan.add_argument(
+        "--pending-dir",
+        metavar="PATH",
+        default=None,
+        help="Optional: directory of pending digest output .md files. If provided, includes inject-pending results.",
+    )
     scan.set_defaults(func=command_scan)
 
     handoff = subparsers.add_parser("handoff", help="Write tasks/current-handoff.md for session recovery.")
@@ -2435,6 +4531,11 @@ def build_parser() -> argparse.ArgumentParser:
     index_lint.add_argument("--report", action="store_true", help="Write a dated index lint Markdown report.")
     index_lint.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
     index_lint.set_defaults(func=command_index_lint)
+
+    xref_lint = subparsers.add_parser("xref-lint", help="Lint cross-references: broken wikilinks, orphan pages, broken Cross References sections.")
+    xref_lint.add_argument("--report", action="store_true", help="Write a dated xref-lint Markdown report.")
+    xref_lint.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    xref_lint.set_defaults(func=command_xref_lint)
 
     review_reconcile = subparsers.add_parser(
         "review-reconcile",
@@ -2485,6 +4586,128 @@ def build_parser() -> argparse.ArgumentParser:
         help="Actually write fixes (default is dry-run).",
     )
     author_fix.set_defaults(func=command_author_fix)
+
+    bare_link_fix = subparsers.add_parser(
+        "bare-link-fix",
+        help="Fix ambiguous bare [[wikilinks]] to explicit relative Markdown links.",
+    )
+    bare_link_fix.add_argument(
+        "--apply", action="store_true",
+        help="Actually write fixes (default is dry-run).",
+    )
+    bare_link_fix.set_defaults(func=command_bare_link_fix)
+
+    pending_match = subparsers.add_parser(
+        "pending-match",
+        help="Compare external pending digest URLs against wiki page URLs (report-only).",
+    )
+    pending_match.add_argument(
+        "--pending-dir",
+        required=True,
+        help="Path to external pending digest directory (required, not hardcoded).",
+    )
+    pending_match.add_argument("--report", action="store_true", help="Write a dated pending-match Markdown report.")
+    pending_match.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    pending_match.set_defaults(func=command_pending_match)
+
+    inject_pending = subparsers.add_parser(
+        "inject-pending",
+        help="Inject content from pending digest files into matching wiki stubs.",
+    )
+    inject_pending.add_argument(
+        "--pending-dir",
+        metavar="PATH",
+        help="Directory containing pending digest output .md files.",
+    )
+    inject_pending.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually inject content (replace stub markers, update status).",
+    )
+    inject_pending.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cap the number of pages injected when --apply is given (default: no limit).",
+    )
+    inject_pending.add_argument("--report", action="store_true", help="Write a dated inject-pending Markdown report.")
+    inject_pending.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    inject_pending.set_defaults(func=command_inject_pending)
+
+    promote_ready = subparsers.add_parser(
+        "promote-ready",
+        help="List non-LingOrm stub pages with substantial content ready for promotion.",
+    )
+    promote_ready.add_argument("--report", action="store_true", help="Write a dated promote-ready Markdown report.")
+    promote_ready.add_argument("--date", type=parse_report_date, help="Report date for naming, in YYYY-MM-DD format.")
+    promote_ready.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually promote pages (change status: stub → wiki, strip stub markers from indexes).",
+    )
+    promote_ready.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cap the number of pages promoted when --apply is given (default: no limit).",
+    )
+    promote_ready.set_defaults(func=command_promote_ready)
+
+    readability_lint = subparsers.add_parser(
+        "readability-lint",
+        help="Detect status:wiki pages with undigested/unformatted content.",
+    )
+    readability_lint.add_argument("--report", action="store_true", help="Write a dated readability-lint Markdown report.")
+    readability_lint.add_argument("--date", type=parse_report_date, help="Report date in YYYY-MM-DD format.")
+    readability_lint.set_defaults(func=command_readability_lint)
+
+    tags_lint = subparsers.add_parser(
+        "tags-lint",
+        help="Audit frontmatter tags field: missing, empty, singleton tags, frequency stats.",
+    )
+    tags_lint.add_argument("--report", action="store_true", help="Write a dated tags-lint Markdown report.")
+    tags_lint.add_argument("--date", type=parse_report_date, help="Report date in YYYY-MM-DD format.")
+    tags_lint.set_defaults(func=command_tags_lint)
+
+    audit_list = subparsers.add_parser(
+        "audit-list",
+        help="List open items from the audit/ directory.",
+    )
+    audit_list.add_argument(
+        "--include-resolved",
+        action="store_true",
+        dest="include_resolved",
+        help="Also list items in audit/resolved/.",
+    )
+    audit_list.set_defaults(func=command_audit_list)
+
+    audit_resolve = subparsers.add_parser(
+        "audit-resolve",
+        help="Close audit items: move to audit/resolved/, update frontmatter, append log.",
+    )
+    audit_resolve.add_argument(
+        "filename",
+        nargs="+",
+        help="One or more audit filenames (basename only, resolved relative to audit/).",
+    )
+    audit_resolve.add_argument(
+        "--summary",
+        required=True,
+        help="One-line resolution summary appended to # Resolution section and log.md.",
+    )
+    audit_resolve.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually write changes (default is dry-run).",
+    )
+    audit_resolve.add_argument(
+        "--date",
+        type=parse_report_date,
+        help="Date for log entry in YYYY-MM-DD format. Defaults to today.",
+    )
+    audit_resolve.set_defaults(func=command_audit_resolve)
 
     return parser
 
