@@ -493,6 +493,14 @@ triage 後只修 P2 readability-lint single-dump issue，前 15 個，修完跑 
 | [`readability-lint-example.md`](audit/example-reports/readability-lint-example.md) | `readability-lint --report` | 未消化的 wiki 頁面與信號分類 |
 | [`tags-lint-example.md`](audit/example-reports/tags-lint-example.md) | `tags-lint --report` | 缺漏／空值 tags、孤立 tag、頻率統計 |
 | [`content-audit-example.md`](audit/example-reports/content-audit-example.md) | `gen_content_audit.py` | 內容品質分流（含信號與動作） |
+| [`status-audit-example.md`](audit/example-reports/status-audit-example.md) | `status-audit --report` | 各分類的 frontmatter status 欄位稽核 |
+| [`index-lint-example.md`](audit/example-reports/index-lint-example.md) | `index-lint --report` | 索引連結驗證、stub 標記檢查 |
+| [`canonical-guard-example.md`](audit/example-reports/canonical-guard-example.md) | `canonical-guard --report` | 過時的 canonical 衝突與解決建議 |
+| [`coverage-example.md`](audit/example-reports/coverage-example.md) | `coverage --report` | Raw 與 wiki URL 比對、待 ingest 候選 |
+| [`duplicates-example.md`](audit/example-reports/duplicates-example.md) | `duplicates --report` | 重複 wiki 頁面 URL 與 canonical 建議 |
+| [`review-reconcile-example.md`](audit/example-reports/review-reconcile-example.md) | `review-reconcile` | 審查發現的規則分類 |
+| [`blocked-report-example.md`](audit/example-reports/blocked-report-example.md) | `blocked-report --report` | 無法自動 promote 的頁面及原因 |
+| [`handoff-example.md`](audit/example-reports/handoff-example.md) | `handoff` | Agent 接續用的 session 交接狀態 |
 
 ## 包含的維護輸出
 

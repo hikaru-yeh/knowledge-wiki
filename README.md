@@ -495,6 +495,14 @@ The `audit/example-reports/` directory contains sanitized sample outputs from ea
 | [`readability-lint-example.md`](audit/example-reports/readability-lint-example.md) | `readability-lint --report` | Undigested wiki pages with signal breakdown |
 | [`tags-lint-example.md`](audit/example-reports/tags-lint-example.md) | `tags-lint --report` | Missing/empty tags, singleton tags, frequency stats |
 | [`content-audit-example.md`](audit/example-reports/content-audit-example.md) | `gen_content_audit.py` | Content quality triage with signals and actions |
+| [`status-audit-example.md`](audit/example-reports/status-audit-example.md) | `status-audit --report` | Frontmatter status field audit per category |
+| [`index-lint-example.md`](audit/example-reports/index-lint-example.md) | `index-lint --report` | Index link validation, stub marker checks |
+| [`canonical-guard-example.md`](audit/example-reports/canonical-guard-example.md) | `canonical-guard --report` | Stale canonical conflicts and resolution suggestions |
+| [`coverage-example.md`](audit/example-reports/coverage-example.md) | `coverage --report` | Raw-vs-wiki URL comparison, ingest candidates |
+| [`duplicates-example.md`](audit/example-reports/duplicates-example.md) | `duplicates --report` | Duplicate wiki page URLs with canonical suggestions |
+| [`review-reconcile-example.md`](audit/example-reports/review-reconcile-example.md) | `review-reconcile` | Rule-based classification of review findings |
+| [`blocked-report-example.md`](audit/example-reports/blocked-report-example.md) | `blocked-report --report` | Pages blocked from auto-promotion with reasons |
+| [`handoff-example.md`](audit/example-reports/handoff-example.md) | `handoff` | Session handoff state for agent continuity |
 
 ## Included Maintenance Outputs
 
