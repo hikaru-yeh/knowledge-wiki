@@ -14,14 +14,14 @@
 
 | Raw File | URL | Suggested Category |
 |---|---|---|
-| `raw/threads/Claude-Core-Context-Management.md` | https://www.threads.com/@example/post/ABC123 | AI 工具 |
-| `raw/threads/Free-Claude-Skills-100-Formulas.md` | https://www.threads.com/@example/post/DEF456 | AI 工具 |
-| `raw/threads/Bangkok-Street-Food-Guide.md` | https://www.threads.com/@example/post/GHI789 | 旅遊美食 |
-| `raw/threads-saved/ADHD-Exercise-Routine.md` | https://www.threads.com/@example/post/JKL012 | 健康生活 |
-| `raw/threads/Random-Life-Observation.md` | https://www.threads.com/@example/post/MNO345 | 生活雜記 |
+| `raw/threads/Topic-A-Guide.md` | https://www.threads.com/@example/post/ABC123 | AI-Tools |
+| `raw/threads/Topic-B-Collection.md` | https://www.threads.com/@example/post/DEF456 | AI-Tools |
+| `raw/threads/Topic-C-Overview.md` | https://www.threads.com/@example/post/GHI789 | Travel |
+| `raw/threads-saved/Topic-D-Routine.md` | https://www.threads.com/@example/post/JKL012 | Health |
+| `raw/threads/Topic-E-Notes.md` | https://www.threads.com/@example/post/MNO345 | Lifestyle |
 
 ## Raw Files Missing URL
 
 | Raw File | Title |
 |---|---|
-| `raw/threads-iphone/Level Up Your Vibe Coding with MongoDB.md` | Level Up Your Vibe Coding with MongoDB |
+| `raw/threads-iphone/Topic-F-Example.md` | Topic F Example |

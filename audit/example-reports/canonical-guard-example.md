@@ -23,4 +23,4 @@ Validates `作者` field. Valid: `[]`, `["@handle"]`, `["@a", "@b"]`. Invalid: `
 
 | Path | Rule | Severity | Actual Value |
 |---|---|---|---|
-| `wiki-pages/AI-Tools/example-page.md` | author-unquoted-bracket | error | `[@someuser]` |
+| `wiki-pages/AI-Tools/example-page.md` | author-unquoted-bracket | error | `[@example-user]` |

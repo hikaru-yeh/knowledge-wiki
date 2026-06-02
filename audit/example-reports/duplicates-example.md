@@ -17,31 +17,31 @@ This is a report-only scan. No files were modified.
 
 ### Group 1 — https://www.threads.com/@example/post/ABC123
 
-Suggested canonical: `wiki-pages/旅遊美食/台北漢堡排名.md`
+Suggested canonical: `wiki-pages/Travel/example-canonical-page.md`
 
 | Status | Is Hub | Path | Body chars | Index refs |
 |---|---|---|---:|---:|
-| wiki | no | `wiki-pages/旅遊美食/台北漢堡排名.md` | 2450 | 1 |
-| wiki | yes | `wiki-pages/旅遊美食/台灣美食.md` | 1800 | 1 |
-| stub | no | `wiki-pages/旅遊美食/臺北市漢堡.md` | 120 | 0 |
+| wiki | no | `wiki-pages/Travel/example-canonical-page.md` | 2450 | 1 |
+| wiki | yes | `wiki-pages/Travel/example-hub-page.md` | 1800 | 1 |
+| stub | no | `wiki-pages/Travel/example-duplicate-page.md` | 120 | 0 |
 
 Suggested action:
-- Keep `wiki-pages/旅遊美食/台北漢堡排名.md` as canonical.
+- Keep `wiki-pages/Travel/example-canonical-page.md` as canonical.
 - Merge useful content from other pages.
 - Replace wikilinks pointing to duplicates.
 - Delete duplicates after review.
 
 ### Group 2 — https://www.threads.com/@example/post/DEF456
 
-Suggested canonical: `wiki-pages/健康生活/核心運動.md`
+Suggested canonical: `wiki-pages/Health/example-main-page.md`
 
 | Status | Is Hub | Path | Body chars | Index refs |
 |---|---|---|---:|---:|
-| wiki | no | `wiki-pages/健康生活/核心運動.md` | 1200 | 1 |
-| stub | no | `wiki-pages/健康生活/每天10-20分鐘把核心練起來.md` | 80 | 0 |
+| wiki | no | `wiki-pages/Health/example-main-page.md` | 1200 | 1 |
+| stub | no | `wiki-pages/Health/example-alt-title-page.md` | 80 | 0 |
 
 Suggested action:
-- Keep `wiki-pages/健康生活/核心運動.md` as canonical.
+- Keep `wiki-pages/Health/example-main-page.md` as canonical.
 - Merge useful content from other pages.
 - Replace wikilinks pointing to duplicates.
 - Delete duplicates after review.

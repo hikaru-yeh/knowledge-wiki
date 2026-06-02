@@ -30,9 +30,9 @@ To start next session: read this file, then run `python tools/wiki_maintain.py s
 
 ## Files Touched In This Batch
 
-- `wiki-pages/AI-Tools/unstructured-paste.md` (restructured, single-dump → resolved)
-- `wiki-pages/AI-Tools/Agent/agent-ecosystem.md` (restructured, single-dump → resolved)
-- `wiki-pages/AI-Tools/Agent/harness-engineering.md` (restructured, single-dump → resolved)
+- `wiki-pages/AI-Tools/example-page-1.md` (restructured, single-dump → resolved)
+- `wiki-pages/AI-Tools/Agent/example-page-2.md` (restructured, single-dump → resolved)
+- `wiki-pages/AI-Tools/Agent/example-page-3.md` (restructured, single-dump → resolved)
 - ... (17 more pages restructured)
 
 ## Validations Passed

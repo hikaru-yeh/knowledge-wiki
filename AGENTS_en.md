@@ -181,10 +181,18 @@ Required flow:
    - draft index summaries
 4. Wait for user approval.
 5. Create or update the wiki pages.
-6. Update cross references if needed.
-7. Append a log entry:
+6. Apply quality gate (for pages with planned `status: wiki` only):
+   - Must have at least 2 meaningful H2/H3 headings (not counting `## Main Content`
+     or `## Cross References`)
+   - Must have a summary paragraph or key-point extraction (do not open with the
+     source's first sentence verbatim)
+   - If the source is a social media post, reorganize conversational prose into
+     structured paragraphs
+   - If any condition fails → mark as `status: stub` for later promotion
+7. Update cross references if needed.
+8. Append a log entry:
    - `## [YYYY-MM-DD] ingest | <document name> | status: <stub/wiki/reference>`
-8. If page creation or deletion changes indexes, update relevant indexes and
+9. If page creation or deletion changes indexes, update relevant indexes and
    the global dashboard.
 
 ### Promote
@@ -362,6 +370,35 @@ Markdown relative link:
 ```markdown
 [Page Title](<../分類/Page Title.md>)
 ```
+
+## Subcategory Naming Rules
+
+When a category contains fundamentally different content types, use H2 section
+names that clearly indicate format or medium.
+
+### Dimension: Format / Medium
+
+When a topic has content in different media, prefix H2 sections by medium:
+
+- `Video-XXX`: video clips, livestream segments, instructional recordings
+- `Writing-XXX`: articles, stories, essays, long-form notes
+- `Interview-XXX`: interviews, conversations, Q&A transcripts
+- `Visual-XXX`: image sets, photo collections, visual material
+
+Rules:
+
+- If a category has only one format, skip the prefix and name by content meaning.
+- Do not mix different media formats within one H2 section.
+
+## Index Location Rules
+
+- All indexes live under `wiki-pages/index/`, not inside category folders.
+- Each major category should have exactly one index file; subcategories fold in
+  as H2 sections.
+- Do not create a separate index file for a subcategory unless the category
+  grows too large for a single file.
+- Capability indexes (`能力-*.md`) are horizontal cross-cutting indexes and exist
+  separately; they do not replace vertical category indexes.
 
 ## Capability Indexes
 

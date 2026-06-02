@@ -161,10 +161,15 @@ status: stub | wiki | reference
    - 該頁面在索引的「重點」欄位草稿（須符合「重點欄位強制規則」）
 4. 等待使用者核准。
 5. 建立或更新相關 wiki 頁面。
-6. 視需要更新交叉參照；人工仍需補正確的 `[[wikilinks]]`。
-7. 在 `wiki-pages/log.md` 追加一筆 log：
+6. 產出品質閘門（僅適用預定 `status: wiki` 的頁面）：
+   - 必須有至少 2 個有意義的 H2/H3 heading（不含 `## Main Content`、`## Cross References`）
+   - 必須有摘要段落或重點提取（不可直接以來源原文第一句開頭）
+   - 若來源是社群媒體貼文，必須將口語化敘述重新組織為結構化段落
+   - 不符合上述任一條件 → 暫標 `status: stub`，待後續 promote 時再整理
+7. 視需要更新交叉參照；人工仍需補正確的 `[[wikilinks]]`。
+8. 在 `wiki-pages/log.md` 追加一筆 log：
    - `## [YYYY-MM-DD] ingest | <document name> | status: <stub/wiki/reference>`
-8. 當頁面的建立或刪除會改變索引時，更新 `wiki-pages/index/總索引.md` 的狀態儀表板與相關索引頁。
+9. 當頁面的建立或刪除會改變索引時，更新 `wiki-pages/index/總索引.md` 的狀態儀表板與相關索引頁。
 
 #### threads-saved frontmatter 規則
 
@@ -454,6 +459,7 @@ status: stub  # Level 1（純觀點）；若為 Level 2（含指令/步驟/範�
 ## 索引頁所屬位置規則
 
 - 所有索引統一放在 `wiki-pages/index/` 底下，不放在各分類資料夾內
+- 每個大分類只有一個索引檔；子分類作為 H2 折入同一個索引
 - 子分類不應獨立成為單獨的索引檔，除非分類龐大到需要兩層
 - 能力索引（`能力-*.md`）是橫向索引，獨立存在，不替代縱向分類索引
 

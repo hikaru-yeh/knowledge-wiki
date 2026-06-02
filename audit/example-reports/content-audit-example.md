@@ -31,7 +31,6 @@ Scans `wiki-pages/` for `status: wiki` or `reference` pages with body < 500 char
 | `ext_url` | Body contains non-Threads external URLs |
 | `tw_url_only` | Body is mostly a Threads URL with minimal text |
 | `raw_gone` | Corresponding raw source file no longer exists |
-| `lingorm` | Page belongs to LingOrm category (special handling) |
 
 ## Suggested Actions
 

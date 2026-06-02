@@ -22,7 +22,7 @@ This is a report-only audit of `wiki-pages/**/*.md`. It excludes `README.md` fil
 
 ## Project-Management Statuses
 
-`active` and `legacy` are legal only under `wiki-pages/專案管理/`.
+`active` and `legacy` are legal only under `wiki-pages/project-management/`.
 
 | Status | Count |
 |---|---:|
@@ -49,8 +49,8 @@ None detected.
 ## Excluded README Files
 
 - `wiki-pages/README.md`
-- `wiki-pages/專案管理/projects/README.md`
-- `wiki-pages/專案管理/README.md`
+- `wiki-pages/project-management/projects/README.md`
+- `wiki-pages/project-management/README.md`
 
 ## Frontmatter Author Issues
 
@@ -58,6 +58,6 @@ Validates `作者` field. Valid: `[]`, `["@handle"]`, `["@a", "@b"]`. Invalid: `
 
 | Path | Rule | Severity | Actual Value |
 |---|---|---|---|
-| `wiki-pages/AI-Tools/example-bare-author.md` | author-unquoted-bracket | error | `[@gracetzeng]` |
-| `wiki-pages/Health/another-bare-author.md` | author-unquoted-bracket | error | `[@healthguru]` |
-| `wiki-pages/Misc/bare-string-author.md` | author-bare-string | error | `@someuser` |
+| `wiki-pages/AI-Tools/example-bare-author.md` | author-unquoted-bracket | error | `[@example-author]` |
+| `wiki-pages/Health/another-bare-author.md` | author-unquoted-bracket | error | `[@another-author]` |
+| `wiki-pages/Misc/bare-string-author.md` | author-bare-string | error | `@example-user` |

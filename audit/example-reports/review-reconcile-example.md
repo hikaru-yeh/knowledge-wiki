@@ -24,7 +24,7 @@ This is a rule-based classification report. It does not modify wiki content.
 
 ## known-deferred
 
-- review-finding: LingOrm stubs not promoted (by policy)
+- review-finding: Category stubs deferred by policy
 - review-finding: Tags field empty on stub pages (not prioritized)
 
 ## pre-existing

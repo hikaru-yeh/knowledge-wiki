@@ -13,9 +13,8 @@
 | tags-lint | 0 | 0 | 25 |
 | coverage | 0 | 1 | 3 |
 | duplicates | 0 | 0 | 0 |
-| blocked-nonlingorm | 0 | 0 | 0 |
-| blocked-lingorm | 0 | 0 | 8 |
-| **Total** | **0** | **8** | **51** |
+| blocked-pages | 0 | 0 | 3 |
+| **Total** | **0** | **8** | **46** |
 
 ## Status Audit
 
@@ -29,7 +28,7 @@
 | Index | Line | Target | Page Status | Index Marker |
 |---|---:|---|---|---|
 | `wiki-pages/index/AI-工具-索引.md` | 45 | `Example Page` | wiki | has stub marker |
-| `wiki-pages/index/工具軟體-索引.md` | 12 | `Another Page` | stub | no stub marker |
+| `wiki-pages/index/Software-Tools-索引.md` | 12 | `Another Page` | stub | no stub marker |
 
 ## Cross-Reference Lint
 
@@ -60,9 +59,9 @@
 
 | # | Code | Path | Headings | Body len | Detail |
 |---|------|------|---:|---:|--------|
-| 1 | single-dump | `wiki-pages/AI-Tools/unstructured-paste.md` | 0 | 1100 | 0 meaningful headings, no format elements |
-| 2 | social-tone | `wiki-pages/AI-Tools/social-post-example.md` | 3 | 710 | social media tone detected |
-| 3 | no-formatting | `wiki-pages/AI-Tools/wall-of-text.md` | 2 | 2750 | has headings but no bullet lists, code blocks, tables |
+| 1 | single-dump | `wiki-pages/AI-Tools/example-page-1.md` | 0 | 1100 | 0 meaningful headings, no format elements |
+| 2 | social-tone | `wiki-pages/AI-Tools/example-page-2.md` | 3 | 710 | social media tone detected |
+| 3 | no-formatting | `wiki-pages/AI-Tools/example-page-3.md` | 2 | 2750 | has headings but no bullet lists, code blocks, tables |
 | ... | ... | ... | ... | ... | 9 more issues |
 
 ## Tags Lint (25 issues)
@@ -79,18 +78,13 @@
 
 | Raw File | Suggested Category |
 |---|---|
-| `raw/threads/Example-Topic.md` | AI 工具 |
-| `raw/threads/Another-Topic.md` | 生活雜記 |
-| `raw/threads/Third-Topic.md` | AI 工具 |
-
-## Blocked LingOrm Excluded (8)
-
-8 LingOrm stubs excluded by policy.
+| `raw/threads/Topic-A-Guide.md` | AI-Tools |
+| `raw/threads/Topic-B-Notes.md` | Lifestyle |
+| `raw/threads/Topic-C-Overview.md` | AI-Tools |
 
 ## Suggested Next Agent Prompt
 
 ```text
 請依照 audit/maintenance-reports/maintenance-report-YYYY-MM-DD.md，只處理 Errors。
-LingOrm stub 保留。
 先提出修復計畫，不要直接大批刪檔。
 ```
